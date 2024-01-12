@@ -3,56 +3,86 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"os"
-	"strings"
 	"log"
 	"net/url"
+	"os"
+	"os/exec"
 	"strconv"
-
-	"Gzhodan/storage.go"
+	"strings"
 )
+
 func checkError(err error) {
 	if err != nil {
-    	log.Fatal(err)
-    }
+		log.Fatal(err)
+	}
 }
 
 // Map = domain + id : url
-func marshalURLsToMap(urlsFile) (map[string]string, error) { 
-		file, err := os.Open(urlsFile)
-		if err != nil {
+func marshalURLsToMap() (map[string]string, error) {
+	file, err := os.Open("urls.txt")
+	if err != nil {
 		panic(err)
 	}
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	urlsSlice := make([]string, 0, 0)
 	urlsMapped := make(map[string]string)
+	urlStr := ""
 	domainIDCounter := 1
-	
+
 	for scanner.Scan() {
-		urlSlice = append(scanner.Text())
-	
-	if err := scanner.Err(); err != nil {
-			panic(err)
-	}
-	for _, u := range urls {
-		parsedURL, err := url.Parse(u)
+		urlStr = scanner.Text()
+		parsedURL, err := url.Parse(urlStr)
 		if err != nil {
-			panic(err)
+			fmt.Printf("Invalid URL: %s\n", urlStr)
+			continue
 		}
 
 		hostname := parsedURL.Hostname()
 		if _, ok := urlsMapped[hostname]; !ok {
-			urlsMapped[hostname] = strconv.Itoa(id)
+			urlsMapped[hostname] = strconv.Itoa(domainIDCounter)
 			domainIDCounter++
 		}
+
+		if err := scanner.Err(); err != nil {
+			panic(err)
+		}
+
 	}
-	
+
 	return urlsMapped, nil
 }
 
-func main() {
+// Because is it used by people
+func execCurl(args string) error {
+	cmd := exec.Command("curl", args)
+	err := cmd.Run()
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
+	return nil
+}
 
-	
+func main() {
+	urlsToVist, err := marshalURLsToMap()
+	checkError(err)
+
+	cmdArgsBuilder := strings.Builder{}
+
+	curlArgs := "-X GET -A Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36 "
+	curlLimitRateFlag := "--limit-rate 10000B "
+	curlOutputFlag := "-o "
+
+	for _, url := range urlsToVist {
+		cmdArgsBuilder.WriteString(curlArgs)
+		cmdArgsBuilder.WriteString(curlLimitRateFlag)
+		cmdArgsBuilder.WriteString(url)
+		cmdArgsBuilder.WriteString(" ")
+		cmdArgsBuilder.WriteString(curlOutputFlag)
+		cmdArgsBuilder.WriteString("test.txt")
+		execCurl(cmdArgsBuilder.String())
+		cmdArgsBuilder.Reset()
+	}
+
 }
