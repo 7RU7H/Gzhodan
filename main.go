@@ -73,6 +73,22 @@ func main() {
 	}
 
 	firefoxArgs := os.Args
-		
+	
+	firefoxHandle := "firefox"
+	xdotoolHandle := "xdotool" 
+	
+
+	xdtOpenTerminalAndFirefox := " key ctrl+alt+t sleep 1 type firefox Enter"
+
+	xdtFindFirefox := " search --onlyvisible --name firefox | head -n 1"
+	xdtGoToURLinFirefox := " key \"ctrl+l\" type " // needs xdtEnterKey
+	xdtEnterKey := " Enter" 
+
+  	xdtSavePageToPath := " key \"ctrl+s\" sleep 2 type " // needs xdtEnterKey
+
+	xdtCloseFirefox := " key --clearmodifiers \"ctrl+F4\""
+	
+	//xdtFindSaveAsBox := " search --name \"Save as\""
+
 
 }
