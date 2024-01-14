@@ -94,6 +94,7 @@ urls.txt
 
 ## Inspirations, Ideas, etc
 
+https://github.com/abiyani/automate-save-page-as/blob/master/save_page_as - ./spa url flags firefox
 
 https://www.educative.io/answers/how-to-implement-a-queue-in-golang
 https://dev.to/vearutop/memory-arenas-in-go-j1f

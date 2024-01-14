@@ -54,47 +54,25 @@ func marshalURLsToMap() (map[string]string, map[string]int, error) {
 	return urlsMapped, domainCounter, nil
 }
 
-// Because is it used by people
-func execCurl(args string) error {
-	cmd := exec.Command("curl", args)
-	err := cmd.Run()
-	if err != nil {
-		log.Fatal(err)
-		return err
-	}
-	return nil
-}
+
 
 func main() {
 	urlsToVist, baseDNSurlTotals, err := marshalURLsToMap()
 	checkError(err)
 
-	allBaseUrlsArr := make([]string, 0, len(urlsToVist))
+	allBaseUrlsSeq := make([]string, 0, len(urlsToVist))
 	for k := range urlsToVist {
-		allBaseUrlsArr = append(allBaseUrlsArr, k)
+		allBaseUrlsSeq = append(allBaseUrlsArr, k)
 	}
 
-	// Human spawl linear request by link domain/url, if possible from a base url
-	// No-touching-The-Sides algo - a = 3,b = 4,c = 5,d = 1, e = 1 -> a1,b1,c1,a2,b2,c2,b3,c3,d1,e1,a1,b1,c4
+	totalUrls := 0
+	totalDomains := len(baseDNSurlTotals)-1
 
-	queue := make([]string, 0, len(allBaseUrlsArr))
-
-	cmdArgsBuilder := strings.Builder{}
-
-	curlArgs := "-X GET -A Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36 "
-	//	curlLimitRateFlag := "--limit-rate 10000B "
-	curlOutputFlag := "-o "
-
-	// Replace with queue
-	for _, url := range urlsToVist {
-		cmdArgsBuilder.WriteString(curlArgs)
-		//	cmdArgsBuilder.WriteString(curlLimitRateFlag)
-		cmdArgsBuilder.WriteString(url)
-		cmdArgsBuilder.WriteString(" ")
-		cmdArgsBuilder.WriteString(curlOutputFlag)
-		cmdArgsBuilder.WriteString("test.txt")
-		execCurl(cmdArgsBuilder.String())
-		cmdArgsBuilder.Reset()
+	for _,val := range baseDNSurlTotals {
+		totalUrls =+ val
 	}
+
+	firefoxArgs := os.Args
+		
 
 }
