@@ -103,6 +103,24 @@ func main() {
 	}
 
 	err := xtdFFGetNewPages(saveDirectory, allBaseUrlsArr)
+
 	
+	
+	entries, err := os.ReadDir(saveDirectory)
+	checkError(err)
+ 	var todaysInitialPages []string
+  	for _, entry := range entries {
+       todaysInitialPages = append(files, entry.Name())
+    }
+	for _,pathtofile := range todaysInitialPages {
+		file, err := os.Open()
+		checkError(err)
+		defer file.Close()
+		doc, err := goquery.NewDocumentFromReader(file)
+		//
+		// BRAIN NEED THUNK HERE
+		//
+
+	}
 
 }
