@@ -54,7 +54,37 @@ func marshalURLsToMap() (map[string]string, map[string]int, error) {
 	return urlsMapped, domainCounter, nil
 }
 
+func xtdFFGetNewPages(saveDirectory string, urlArr[]string) error {
+	xdotoolHandle := "xdotool" 
+	xdtOpenTerminalAndFirefox := " key ctrl+alt+t sleep 1 type firefox Enter"
+	xdtFindFirefox := " search --onlyvisible --name firefox | head -n 1"
+	xdtGoToURLinFirefox := " key \"ctrl+l\" type " // needs xdtEnterKey
+	xdtEnterKey := " Enter" 
+  	xdtSavePageToPath := " key \"ctrl+s\" sleep 2 type " // needs xdtEnterKey
+	xdtCloseFirefox := " key --clearmodifiers \"ctrl+F4\""
+	//xdtFindSaveAsBox := " search --name \"Save as\""
+	
+	initXdoTool := exec.Command(xdotoolHandle, xdtOpenTerminalAndFirefox)
+	err := initXdoTool.Run()
+	checkError(err)	
+	initXdoTool.Stdin = strings.NewReader(xdotoolHandle, xdtFindFirefox)
+	err := initXdoTool.Run()
+	checkError(err)	
+	for _,url := range urlArr { 
+		initXdoTool.Stdin = strings.NewReader(xdotoolHandle, xdtGoToURLinFirefox, url, xdtEnterKey)
+		err := initXdoTool.Run()
+		checkError(err)	
+		initXdoTool.Stdin = strings.NewReader(xdotoolHandle, xdtSavePageToPath, saveDirectory, xdtEnterKey)
+		err := initXdoTool.Run()
+		checkError(err)	
+	}
+	initXdoTool.Stdin = strings.NewReader(xdotoolHandle, xdtCloseFirefox, xdtEnterKey)
+	err := initXdoTool.Run()
+	checkError(err)	
 
+	return nil
+}
+	
 
 func main() {
 	urlsToVist, baseDNSurlTotals, err := marshalURLsToMap()
@@ -72,23 +102,7 @@ func main() {
 		totalUrls =+ val
 	}
 
-	firefoxArgs := os.Args
+	err := xtdFFGetNewPages(saveDirectory, allBaseUrlsArr)
 	
-	firefoxHandle := "firefox"
-	xdotoolHandle := "xdotool" 
-	
-
-	xdtOpenTerminalAndFirefox := " key ctrl+alt+t sleep 1 type firefox Enter"
-
-	xdtFindFirefox := " search --onlyvisible --name firefox | head -n 1"
-	xdtGoToURLinFirefox := " key \"ctrl+l\" type " // needs xdtEnterKey
-	xdtEnterKey := " Enter" 
-
-  	xdtSavePageToPath := " key \"ctrl+s\" sleep 2 type " // needs xdtEnterKey
-
-	xdtCloseFirefox := " key --clearmodifiers \"ctrl+F4\""
-	
-	//xdtFindSaveAsBox := " search --name \"Save as\""
-
 
 }
