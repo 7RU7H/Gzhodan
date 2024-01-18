@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/anaskhan96/soup"
 )
 
 func checkError(err error) {
@@ -85,6 +87,27 @@ func xtdFFGetNewPages(saveDirectory string, urlArr[]string) error {
 	return nil
 }
 	
+func gzlopBuffer(buffer *bytes.Buffer, patterns []byte) (map[int]string, error) {
+	patCount := int(0)
+	artifacts := make(map[int]string)
+	builder := strings.Builder{}
+	scanner := bufio.NewScanner(buffer)
+	for scanner.Scan() {
+		for i := 0; i <= len(patterns)-1; i++ {
+			if bytes.Contains(scanner.Bytes(), []byte{patterns[i]}) {
+				patCount++
+				builder.WriteString(string(patterns[i]))
+				artifacts[patCount] = builder.String()
+				builder.Reset()
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+	return artifacts, nil
+}
+
 
 func main() {
 	urlsToVist, baseDNSurlTotals, err := marshalURLsToMap()
@@ -109,14 +132,28 @@ func main() {
 	entries, err := os.ReadDir(saveDirectory)
 	checkError(err)
  	var todaysInitialPages []string
+	allTheArtefacts := make(map[int]map[int]string)
   	for _, entry := range entries {
        todaysInitialPages = append(files, entry.Name())
     }
-	for _,pathtofile := range todaysInitialPages {
-		file, err := os.Open()
+	for _,pathToFile := range todaysInitialPages {
+		data, err := ioutil.ReadFile(pathToFile)
 		checkError(err)
 		defer file.Close()
-		doc, err := goquery.NewDocumentFromReader(file)
+
+		// TODO
+		// map memory - for the same ~~paragraph~~ search for dates, url and tokens 
+		// soup go gets all the fields that have urls like gospider (CHECK HOW THAT WORK and do it locally)
+		// gzlop buffer can then be adapter to search the buffer from address to offset for EVEN MORE SPEED
+		buffer := bytes.NewBuffer(data)
+		doc := soup.HTMLParse(string(data))
+
+		// Naive Search for a token 
+		for _, token : range searchTokens {
+			artifacts, err := gzlopBuffer(buffer, token)
+			checkError(err)
+			allTheArtefacts[token] = artifacts 
+		}	
 		//
 		// BRAIN NEED THUNK HERE
 		//

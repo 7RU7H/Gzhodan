@@ -64,17 +64,17 @@ Pieces then Asynchoronous HARMONY!
 urls.txt
 
 0. Develop the Gzombie
-    - How to develop the HUMANESS of firefox/curl cli browsing the internet from the CLI
-        - Browser extensions 
-            - No JS and configure   
+    - How to develop the HUMANESS of firefox/curl cli browsing the internet from the CLI  - DONE
+        - Browser extensions - FIREFOX HAS EXTENSIONS
+            - No JS and configure, etc
         - Jitter that match    
-    - How to test the HUMANESS of firefox cli browsing the internet from the CLI         
-    - Queueing of tasks
-        - What is the safest traversal over all urls to avoid rate limiting (a(1-20),b(1,1,2,3,4,5)(1-5)...e(1)) - e(1) being SANS risk b being portswigger
-        - just a array sequencer rather than a graph
+    - How to test the HUMANESS of firefox cli browsing the internet from the CLI?       
+    - Queueing of tasks - DONE - ANSWER simple and dumb human open browser and links some links from a bookmark - over enigneering is bad
+        - What is the safest traversal over all urls to avoid rate limiting (a(1-20),b(1,1,2,3,4,5)(1-5)...e(1)) - e(1) being SANS risk b being portswigger - CHILL
+        - just a array sequencer rather than a graph - CHILL
 1. Develop the ingestion
-    - curl to buffer
-    - MODIFY https://cs.opensource.google/go/go/+/refs/tags/go1.21.6:src/net/http/client.go;l=483 
+    - curl to buffer - FIREFOX AND XDOTOOL TO DOWNLOAD PAGES
+    - MODIFY https://cs.opensource.google/go/go/+/refs/tags/go1.21.6:src/net/http/client.go;l=483 - OVERENGINEERING NOT DOING
 2. Develop the logging and data retention
     - application.log
     - storage.log
