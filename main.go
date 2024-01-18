@@ -56,36 +56,58 @@ func marshalURLsToMap() (map[string]string, map[string]int, error) {
 	return urlsMapped, domainCounter, nil
 }
 
-func xtdFFGetNewPages(saveDirectory string, urlArr[]string) error {
-	xdotoolHandle := "xdotool" 
+func xtdFFGetNewPages(saveDirectory string, urlArr []string) error {
+	xdotoolHandle := "xdotool"
 	xdtOpenTerminalAndFirefox := " key ctrl+alt+t sleep 1 type firefox Enter"
 	xdtFindFirefox := " search --onlyvisible --name firefox | head -n 1"
 	xdtGoToURLinFirefox := " key \"ctrl+l\" type " // needs xdtEnterKey
-	xdtEnterKey := " Enter" 
-  	xdtSavePageToPath := " key \"ctrl+s\" sleep 2 type " // needs xdtEnterKey
-	xdtCloseFirefox := " key --clearmodifiers \"ctrl+F4\""
-	//xdtFindSaveAsBox := " search --name \"Save as\""
 	
+	xdtEnterKey := " Enter"
+	xdtSavePageToPath := " key \"ctrl+s\" sleep 2 type " // needs xdtEnterKey	
+	xdtCloseFirefox := " key --clearmodifiers \"ctrl+F4\""
+	
+	subCmdBuilder := strings.Builder{}
 	initXdoTool := exec.Command(xdotoolHandle, xdtOpenTerminalAndFirefox)
 	err := initXdoTool.Run()
+	checkError(err)
+	subCmdBuilder.WriteString(xdotoolHandle)
+	subCmdBuilder.WriteString(xdtFindFirefox)
+	initXdoTool.Stdin = strings.NewReader(subCmdBuilder.String())
+	err = initXdoTool.Run()
 	checkError(err)	
-	initXdoTool.Stdin = strings.NewReader(xdotoolHandle, xdtFindFirefox)
-	err := initXdoTool.Run()
-	checkError(err)	
-	for _,url := range urlArr { 
-		initXdoTool.Stdin = strings.NewReader(xdotoolHandle, xdtGoToURLinFirefox, url, xdtEnterKey)
-		err := initXdoTool.Run()
-		checkError(err)	
-		initXdoTool.Stdin = strings.NewReader(xdotoolHandle, xdtSavePageToPath, saveDirectory, xdtEnterKey)
-		err := initXdoTool.Run()
-		checkError(err)	
-	}
-	initXdoTool.Stdin = strings.NewReader(xdotoolHandle, xdtCloseFirefox, xdtEnterKey)
-	err := initXdoTool.Run()
-	checkError(err)	
+	subCmdBuilder.Reset()
+	
+	for _, url := range urlArr {
+		subCmdBuilder.WriteString(xdotoolHandle)
+		subCmdBuilder.WriteString(xdtGoToURLinFirefox)
+		subCmdBuilder.WriteString(url)
+		subCmdBuilder.WriteString(xdtEnterKey)
+		initXdoTool.Stdin = strings.NewReader(subCmdBuilder.String())
+		err = initXdoTool.Run()
+		checkError(err)
+		subCmdBuilder.Reset()
 
+		subCmdBuilder.WriteString(xdotoolHandle)
+		subCmdBuilder.WriteString(xdtSavePageToPath)
+		subCmdBuilder.WriteString(saveDirectory)
+		subCmdBuilder.WriteString(xdtEnterKey)
+		initXdoTool.Stdin = strings.NewReader(subCmdBuilder.String())
+		err = initXdoTool.Run()	
+		subCmdBuilder.Reset()
+	}
+	
+	subCmdBuilder.WriteString(xdotoolHandle)
+	subCmdBuilder.WriteString(xdtCloseFirefox)
+	subCmdBuilder.WriteString(xdtEnterKey)
+	initXdoTool.Stdin = strings.NewReader(subCmdBuilder.String())
+	err = initXdoTool.Run()
+	subCmdBuilder.Reset()
+	
+	  
+	
 	return nil
-}
+	
+	}
 	
 func gzlopBuffer(buffer *bytes.Buffer, patterns []byte) (map[int]string, error) {
 	patCount := int(0)
@@ -149,7 +171,7 @@ func main() {
 		doc := soup.HTMLParse(string(data))
 
 		// Naive Search for a token 
-		for _, token : range searchTokens {
+		for _, token := range searchTokens {
 			artifacts, err := gzlopBuffer(buffer, token)
 			checkError(err)
 			allTheArtefacts[token] = artifacts 
@@ -161,3 +183,4 @@ func main() {
 	}
 
 }
+

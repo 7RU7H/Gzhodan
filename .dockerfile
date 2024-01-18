@@ -2,7 +2,7 @@ FROM debian:slim:latest
 
 RUN apt update -y && apt upgrade -y && apt autoremove -y
 
-RUN apt install xdotool
+RUN apt install firefox xdotool -y 
 
 
 # Always install newest golang
