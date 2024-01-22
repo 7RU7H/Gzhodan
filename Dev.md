@@ -94,6 +94,8 @@ urls.txt
 
 ## Inspirations, Ideas, etc
 
+https://www.digitalocean.com/community/tutorials/how-to-use-dates-and-times-in-go
+
 https://github.com/abiyani/automate-save-page-as/blob/master/save_page_as - ./spa url flags firefox
 
 https://www.educative.io/answers/how-to-implement-a-queue-in-golang

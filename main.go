@@ -63,15 +63,6 @@ func marshalURLsToMap() (map[string]string, map[string]int, error) {
 		domainCounter[hostname] = counter + 1
 	}
 
-	// Write a function for gohelp
-	if len(urlsMapped) == 0 {
-
-	}
-
-	if len(domainCounter) == 0 {
-
-	}
-
 	return urlsMapped, domainCounter, nil
 }
 
@@ -147,7 +138,33 @@ func gzlopBuffer(buffer *bytes.Buffer, patterns []byte) (map[int]string, error) 
 	return artifacts, nil
 }
 
+func mkDirAndCD(date) error {
+	if err := os.Mkdir(date, os.ModePerm); err != nil {
+		log.Fatal(err)
+		return err
+	}
+	err := os.Chdir(date)
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
+	
+	return nil
+}
+
 func checkPrevRuntimes(appDir, date string) error {
+        appDirInfo, err := os.Stat(appDir)
+        checkError(err)
+    	dirListing, err := os.ReadDir(addDir)
+	checkError(err)
+ 	for _, dir := range dirListing {
+    		if dir == date {
+			log.Fatal(err)
+			return err
+		} 
+	}
+	return nil	
+}
 		
 }
 
