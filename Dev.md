@@ -76,10 +76,10 @@ urls.txt
     - curl to buffer - FIREFOX AND XDOTOOL TO DOWNLOAD PAGES
     - MODIFY https://cs.opensource.google/go/go/+/refs/tags/go1.21.6:src/net/http/client.go;l=483 - OVERENGINEERING NOT DOING
 2. Develop the logging and data retention
-    - application.log
+    - application.log - added - implement after completed all features
     - storage.log
-    - markdown newletter generation
-    - Diretory stucture for:
+    - markdown newletter generation - wait
+    - Diretory stucture for: - Done
         - YEAR-MONTH-DAY.txt    
 3. Aggregation
     - glzop Library

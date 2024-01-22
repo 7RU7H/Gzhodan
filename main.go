@@ -16,9 +16,9 @@ import (
 )
 
 var (
-    WarningLogger *log.Logger
-    InfoLogger    *log.Logger
-    ErrorLogger   *log.Logger
+	WarningLogger *log.Logger
+	InfoLogger    *log.Logger
+	ErrorLogger   *log.Logger
 )
 
 func checkError(err error) {
@@ -148,24 +148,22 @@ func mkDirAndCD(date) error {
 		log.Fatal(err)
 		return err
 	}
-	
+
 	return nil
 }
 
 func checkPrevRuntimes(appDir, date string) error {
-        appDirInfo, err := os.Stat(appDir)
-        checkError(err)
-    	dirListing, err := os.ReadDir(addDir)
+	appDirInfo, err := os.Stat(appDir)
 	checkError(err)
- 	for _, dir := range dirListing {
-    		if dir == date {
+	dirListing, err := os.ReadDir(addDir)
+	checkError(err)
+	for _, dir := range dirListing {
+		if dir == date {
 			log.Fatal(err)
 			return err
-		} 
+		}
 	}
-	return nil	
-}
-		
+	return nil
 }
 
 func initaliseLogging() error {
@@ -174,33 +172,33 @@ func initaliseLogging() error {
 	nameBuilder := strings.Builder{}
 	nameBuilder.WriteString(dataFormatted)
 	nameBuilder.WriteString(".log")
-    file, err := os.OpenFile(nameBuilder.String(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-    if err != nil {
-        log.Fatal(err)
-	return err
-    }
+	file, err := os.OpenFile(nameBuilder.String(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
 
-    InfoLogger = log.New(file, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
-    WarningLogger = log.New(file, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
-    ErrorLogger = log.New(file, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+	InfoLogger = log.New(file, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	WarningLogger = log.New(file, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
+	ErrorLogger = log.New(file, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
 	return nil
 }
 
 func main() {
-	appDir := "/tmp" // replace with a flag for directory 
+	appDir := "/tmp" // replace with args flag for directory
 	now := time.Now().In(location)
 	date := now.Format("2006-01-01")
 	err := checkPrevRuntimes(appDir, date)
 	checkError(err)
 	mkDirAndCD(date)
 
-	err := initaliseLogging()  
+	err := initaliseLogging()
 	checkError(err)
-	InfoLogger.Println("Loggers initialised")
+	InfoLogger.Println("Logging initialised")
 
-//    InfoLogger.Println("Something noteworthy happened")
-//    WarningLogger.Println("There is something you should know about")
-//    ErrorLogger.Println("Something went wrong")	
+	//    InfoLogger.Println("Something noteworthy happened")
+	//    WarningLogger.Println("There is something you should know about")
+	//    ErrorLogger.Println("Something went wrong")
 
 	urlsToVist, baseDNSurlTotals, err := marshalURLsToMap()
 	checkError(err)
@@ -251,3 +249,4 @@ func main() {
 	}
 
 }
+
