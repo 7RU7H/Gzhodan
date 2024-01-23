@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -20,7 +21,8 @@ type Statistics struct {
 	originalDomains  int
 	originalUrls     int
 	totalUrlsVisited int
-	date string
+	date             string
+	year             string
 }
 
 var (
@@ -92,7 +94,7 @@ func marshalURLsToMap() (map[string]string, map[string]int, error) {
 	return urlsMapped, domainCounter, nil
 }
 
-func softConfFFToSaveAlwaysHTMLOnly(testDir string, recursionCounter int) (int ,error) {
+func softConfFFToSaveAlwaysHTMLOnly(testDir string, recursionCounter int) (int, error) {
 	pageName := "test.html"
 	xdotoolHandle := "xdotool"
 	xdtOpenTerminalAndFirefox := " key ctrl+alt+t sleep 1 type firefox Enter"
@@ -166,10 +168,10 @@ func softConfFFToSaveAlwaysHTMLOnly(testDir string, recursionCounter int) (int ,
 	xdtAndFFSaveProperly := false
 	// check if _files or .txt
 	// delete files
-	
-	if (recursionCounter != 6 && xdtAndFFSaveProperly != true) { 
+
+	if recursionCounter != 6 && xdtAndFFSaveProperly != true {
 		recursionCounter, err = softConfFFToSaveAlwaysHTMLOnly(testDir, recursionCounter)
-	} 
+	}
 
 	return recursionCounter, nil
 }
@@ -295,10 +297,11 @@ func initaliseLogging() error {
 	return nil
 }
 
-func mkAppDirTree(dirTree []string) error {
-	// test, logs, newletters, YEAR - time time time
+func mkAppDirTree(appDir string, dirTree []string) error {
+	var PathAndName string
 	for _, dirName := range dirTree {
-		if err := os.Mkdir(dirName, os.ModePerm); err != nil {
+		PathAndName = filepath.Join(appDir, dirName)
+		if err := os.Mkdir(PathAndName, os.ModePerm); err != nil {
 			log.Fatal(err)
 			return err
 		}
@@ -310,10 +313,14 @@ func main() {
 	appDir := "/tmp" // replace with args flag for directory
 	stat := Statistics{}
 	now := time.Now().UTC()
-	stat.6date = now.Format("2006-01-01")
+	stat.date = now.Format("2006-01-01")
+	stat.year = strconv.Itoa(now.Year())
 	err := checkPrevRuntimes(appDir, stat.date)
-
-	softConfFFToSaveAlwaysHTMLOnly(testDir, 0)
+	dirTree := []string{"test", "logs", "newletters", stat.year}
+	err = mkAppDirTree(appDir, dirTree)
+	checkError(err)
+	testDirFP := filepath.Join(appDir, "test")
+	softConfFFToSaveAlwaysHTMLOnly(testDirFP, 0)
 	checkError(err)
 	mkDirAndCD(date)
 
@@ -324,10 +331,6 @@ func main() {
 	//    InfoLogger.Println("Something noteworthy happened")
 	//    WarningLogger.Println("There is something you should know about")
 	//    ErrorLogger.Println("Something went wrong")
-
-
-
-
 
 	err = mkDirAndCD(date)
 	checkError(err)
