@@ -322,7 +322,7 @@ func main() {
 	testDirFP := filepath.Join(appDir, "test")
 	softConfFFToSaveAlwaysHTMLOnly(testDirFP, 0)
 	checkError(err)
-	mkDirAndCD(date)
+	mkDirAndCD(stat.date)
 
 	err = initaliseLogging()
 	checkError(err)
@@ -332,9 +332,9 @@ func main() {
 	//    WarningLogger.Println("There is something you should know about")
 	//    ErrorLogger.Println("Something went wrong")
 
-	err = mkDirAndCD(date)
+	err = mkDirAndCD(stat.date)
 	checkError(err)
-	saveDirectory := date
+	saveDirectory := stat.date
 
 	urlsToVisit, baseDNSurlTotals, err := marshalURLsToMap()
 	checkError(err)
@@ -357,6 +357,8 @@ func main() {
 
 	err = xtdFFGetNewPages(saveDirectory, allBaseUrlsSeq)
 
+
+	// Where the funky code really begins
 	entries, err := os.ReadDir(saveDirectory)
 	checkError(err)
 	var todaysInitialPages []string
@@ -374,6 +376,7 @@ func main() {
 		// soup go gets all the fields that have urls like gospider (CHECK HOW THAT WORK and do it locally)
 		// gzlop buffer can then be adapter to search the buffer from address to offset for EVEN MORE SPEED
 		buffer := bytes.NewBuffer()
+
 		doc := soup.HTMLParse(string(file))
 
 		// Naive Search for a token
@@ -392,7 +395,53 @@ func main() {
 
 // thunkage for soup ++Brain
 // Account for site differences
-func SiteSpecificsHandler(domain string) {
+// Account for previously ran urls - they have to be unique so no worries
+
+// What are we looking for in html? - ANS: urls, titles
+// find artefacts containing Tokens 
+// Store:
+// id index_of_next_chunk  time + domain + urlused + artefacts { urlfound  + titles; artefacts + tokensMatched } terminationStub; 
+
+
+datastream := marshalArtefactstoDS()
+func writeNewGzhodinToDisk(datastream []bytes) error {
+	extension := ".bin.gzhobin"
+	gzhobinName := ""
+	file, _ := os.Create()
+	defer file.Close()
+	
+
+	for _,data := range datastream { 	
+		err := binary.Write(file, binary.LittleEndian, data)
+		checkError(err)
+	}
+}
+
+// It would be awesome to have a uniform binary file format so that hardcoded address exists at offsets to a being of a file
+
+func loadLastGzhobinToMem() error {
+
+}
+
+
+// GzhobinTemplate needs to be a array of hardcoded offsets   
+func compareCurrAndLastGzhobins() error {
+
+
+	err := binary.Read(lastFile, binary.LittleEndian, XXXX)
+	switch err {
+	case io.EOF: 
+		break
+	case !nil:
+		checkError(err)
+	default:
+		continue
+	}
+
+}
+
+
+func siteSpecificsHandler(domain string) {
 	switch domain {
 	case "arstechnica.com":
 	case "news.ycombinator.com":
@@ -404,4 +453,3 @@ func SiteSpecificsHandler(domain string) {
 	}
 }
 
-// What are we looking for in html? - ANS: urls, titles

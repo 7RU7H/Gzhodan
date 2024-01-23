@@ -12,6 +12,10 @@
 
 
 
+- Gzhobins Golang Zombie Hyper Optimise Binaries
+    - Storage format to save artefacts to check the last visited with currect to speedly check difference    
+
+
 ####  Dealing with the web application outliner
     - ycombinator Hacker News - non hackery tidbits by a set number of points 300+ because I only want the suggestion to go to another site, I am not going to comment, but other might and if they want lower the threshold for using this site they with a flag ASP or fork.
         - https://news.ycombinator.com/?p=1
