@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
@@ -21,6 +20,7 @@ type Statistics struct {
 	originalDomains  int
 	originalUrls     int
 	totalUrlsVisited int
+	date string
 }
 
 var (
@@ -92,13 +92,95 @@ func marshalURLsToMap() (map[string]string, map[string]int, error) {
 	return urlsMapped, domainCounter, nil
 }
 
+func softConfFFToSaveAlwaysHTMLOnly(testDir string, recursionCounter int) (int ,error) {
+	pageName := "test.html"
+	xdotoolHandle := "xdotool"
+	xdtOpenTerminalAndFirefox := " key ctrl+alt+t sleep 1 type firefox Enter"
+	xdtFindFirefox := " search --onlyvisible --name firefox | head -n 1"
+	xtdClick := " key click 1 "                  //
+	xtdDown := " key Down "                      //
+	xdtTab := " key Tab "                        //
+	xdtGotoFileNaming := " key \"ctrl+l\" type " // needs xdtEnterKey
+	xdtEnterKey := " Return"
+	xdtSavePageToPath := " key \"ctrl+s\" sleep 2 type " // needs xdtEnterKey
+	xdtCloseFirefox := " key --clearmodifiers \"ctrl+F4\""
+
+	subCmdBuilder := strings.Builder{}
+	initXdoTool := exec.Command(xdotoolHandle, xdtOpenTerminalAndFirefox)
+	err := initXdoTool.Run()
+	checkError(err)
+	subCmdBuilder.WriteString(xdotoolHandle)
+	subCmdBuilder.WriteString(xdtFindFirefox)
+	initXdoTool.Stdin = strings.NewReader(subCmdBuilder.String())
+	err = initXdoTool.Run()
+	checkError(err)
+	subCmdBuilder.Reset()
+
+	subCmdBuilder.WriteString(xdotoolHandle)
+	subCmdBuilder.WriteString(xdtSavePageToPath)
+	initXdoTool.Stdin = strings.NewReader(subCmdBuilder.String())
+	err = initXdoTool.Run()
+	checkError(err)
+	subCmdBuilder.Reset()
+
+	// Click 1 // to escape writing input for file name - we will return with CTRL+l to then retype any accidentally click input into the Name: input bar
+	subCmdBuilder.WriteString(xtdClick)
+	subCmdBuilder.WriteString(xdtEnterKey)
+	initXdoTool.Stdin = strings.NewReader(subCmdBuilder.String())
+	err = initXdoTool.Run()
+	checkError(err)
+	subCmdBuilder.Reset()
+
+	// Tab 1 // To move gui to Dropdown on save All, HTML only, text
+	subCmdBuilder.WriteString(xdtTab)
+	subCmdBuilder.WriteString(xdtEnterKey)
+	initXdoTool.Stdin = strings.NewReader(subCmdBuilder.String())
+	err = initXdoTool.Run()
+	checkError(err)
+	subCmdBuilder.Reset()
+
+	// Down // Selecting Save only html
+	subCmdBuilder.WriteString(xtdDown)
+	subCmdBuilder.WriteString(xdtEnterKey)
+	initXdoTool.Stdin = strings.NewReader(subCmdBuilder.String())
+	err = initXdoTool.Run()
+	checkError(err)
+	subCmdBuilder.Reset()
+
+	subCmdBuilder.WriteString(xdotoolHandle)
+	subCmdBuilder.WriteString(xdtGotoFileNaming)
+	subCmdBuilder.WriteString(testDir)
+	subCmdBuilder.WriteString(pageName)
+	subCmdBuilder.WriteString(xdtEnterKey)
+	initXdoTool.Stdin = strings.NewReader(subCmdBuilder.String())
+	err = initXdoTool.Run()
+	subCmdBuilder.Reset()
+
+	subCmdBuilder.WriteString(xdotoolHandle)
+	subCmdBuilder.WriteString(xdtCloseFirefox)
+	subCmdBuilder.WriteString(xdtEnterKey)
+	initXdoTool.Stdin = strings.NewReader(subCmdBuilder.String())
+	err = initXdoTool.Run()
+	subCmdBuilder.Reset()
+
+	xdtAndFFSaveProperly := false
+	// check if _files or .txt
+	// delete files
+	
+	if (recursionCounter != 6 && xdtAndFFSaveProperly != true) { 
+		recursionCounter, err = softConfFFToSaveAlwaysHTMLOnly(testDir, recursionCounter)
+	} 
+
+	return recursionCounter, nil
+}
+
 func xtdFFGetNewPages(saveDirectory string, urlArr []string) error {
 	xdotoolHandle := "xdotool"
 	xdtOpenTerminalAndFirefox := " key ctrl+alt+t sleep 1 type firefox Enter"
 	xdtFindFirefox := " search --onlyvisible --name firefox | head -n 1"
 	xdtGoToURLinFirefox := " key \"ctrl+l\" type " // needs xdtEnterKey
 
-	xdtEnterKey := " Enter"
+	xdtEnterKey := " Return"
 	xdtSavePageToPath := " key \"ctrl+s\" sleep 2 type " // needs xdtEnterKey
 	xdtCloseFirefox := " key --clearmodifiers \"ctrl+F4\""
 
@@ -126,6 +208,7 @@ func xtdFFGetNewPages(saveDirectory string, urlArr []string) error {
 		subCmdBuilder.WriteString(xdotoolHandle)
 		subCmdBuilder.WriteString(xdtSavePageToPath)
 		subCmdBuilder.WriteString(saveDirectory)
+		// page name
 		subCmdBuilder.WriteString(xdtEnterKey)
 		initXdoTool.Stdin = strings.NewReader(subCmdBuilder.String())
 		err = initXdoTool.Run()
@@ -212,11 +295,25 @@ func initaliseLogging() error {
 	return nil
 }
 
+func mkAppDirTree(dirTree []string) error {
+	// test, logs, newletters, YEAR - time time time
+	for _, dirName := range dirTree {
+		if err := os.Mkdir(dirName, os.ModePerm); err != nil {
+			log.Fatal(err)
+			return err
+		}
+	}
+	return nil
+}
+
 func main() {
 	appDir := "/tmp" // replace with args flag for directory
+	stat := Statistics{}
 	now := time.Now().UTC()
-	date := now.Format("2006-01-01")
-	err := checkPrevRuntimes(appDir, date)
+	stat.6date = now.Format("2006-01-01")
+	err := checkPrevRuntimes(appDir, stat.date)
+
+	softConfFFToSaveAlwaysHTMLOnly(testDir, 0)
 	checkError(err)
 	mkDirAndCD(date)
 
@@ -228,7 +325,9 @@ func main() {
 	//    WarningLogger.Println("There is something you should know about")
 	//    ErrorLogger.Println("Something went wrong")
 
-	stat := Statistics{}
+
+
+
 
 	err = mkDirAndCD(date)
 	checkError(err)
@@ -263,7 +362,7 @@ func main() {
 		todaysInitialPages = append(files, entry.Name())
 	}
 	for _, pathToFile := range todaysInitialPages {
-		data, err := ioutil.ReadFile(pathToFile)
+		file, err := os.ReadFile(pathToFile)
 		checkError(err)
 		defer file.Close()
 
@@ -271,8 +370,8 @@ func main() {
 		// map memory - for the same ~~paragraph~~ search for dates, url and tokens
 		// soup go gets all the fields that have urls like gospider (CHECK HOW THAT WORK and do it locally)
 		// gzlop buffer can then be adapter to search the buffer from address to offset for EVEN MORE SPEED
-		buffer := bytes.NewBuffer(data)
-		doc := soup.HTMLParse(string(data))
+		buffer := bytes.NewBuffer()
+		doc := soup.HTMLParse(string(file))
 
 		// Naive Search for a token
 		for _, token := range searchTokens {
@@ -287,3 +386,19 @@ func main() {
 	}
 
 }
+
+// thunkage for soup ++Brain
+// Account for site differences
+func SiteSpecificsHandler(domain string) {
+	switch domain {
+	case "arstechnica.com":
+	case "news.ycombinator.com":
+	case "portswigger.net":
+	case "thehackernews.com":
+	case "www.sans.org":
+	default:
+
+	}
+}
+
+// What are we looking for in html? - ANS: urls, titles
