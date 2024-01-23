@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -11,9 +12,16 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/anaskhan96/soup"
 )
+
+type Statistics struct {
+	originalDomains  int
+	originalUrls     int
+	totalUrlsVisited int
+}
 
 var (
 	WarningLogger *log.Logger
@@ -21,21 +29,39 @@ var (
 	ErrorLogger   *log.Logger
 )
 
-func checkError(err error) {
+func checkError(err error) error {
 	if err != nil {
-		fmt.Errorf(err)
+		fmt.Errorf("%s", err)
 		log.Fatal(err)
+		panic(err)
 	}
+	return err
+}
+
+func createFile(filepath string) error {
+	filePtr, err := os.Create(filepath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "File Creation Error:", err)
+		//log.Fatal(err);
+	}
+	defer filePtr.Close()
+	return nil
+}
+
+func checkFileExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	checkError(err)
+	if os.IsNotExist(err) {
+		log.Fatal("File path does not exist")
+		return false, err
+	}
+	return true, nil
 }
 
 // Map = domain + id : url
 func marshalURLsToMap() (map[string]string, map[string]int, error) {
 	file, err := os.Open("urls.txt")
-	if err != nil {
-		fmt.Errorf(err)
-		panic(err)
-	}
-
+	checkError(err)
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
@@ -138,7 +164,7 @@ func gzlopBuffer(buffer *bytes.Buffer, patterns []byte) (map[int]string, error) 
 	return artifacts, nil
 }
 
-func mkDirAndCD(date) error {
+func mkDirAndCD(date string) error {
 	if err := os.Mkdir(date, os.ModePerm); err != nil {
 		log.Fatal(err)
 		return err
@@ -153,24 +179,26 @@ func mkDirAndCD(date) error {
 }
 
 func checkPrevRuntimes(appDir, date string) error {
-	appDirInfo, err := os.Stat(appDir)
-	checkError(err)
-	dirListing, err := os.ReadDir(addDir)
-	checkError(err)
+	dirListing, err := os.ReadDir(appDir)
+	if err != nil {
+		return err
+	}
+
 	for _, dir := range dirListing {
-		if dir == date {
-			log.Fatal(err)
-			return err
+		if dir.Name() == date {
+			log.Fatal(errors.New("Directory already exists"))
+			return errors.New("Directory already exists")
 		}
 	}
+
 	return nil
 }
 
 func initaliseLogging() error {
-	now := time.Now().In(location)
+	now := time.Now().UTC()
 	dateFormatted := now.Format("2006-01-01")
 	nameBuilder := strings.Builder{}
-	nameBuilder.WriteString(dataFormatted)
+	nameBuilder.WriteString(dateFormatted)
 	nameBuilder.WriteString(".log")
 	file, err := os.OpenFile(nameBuilder.String(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
@@ -186,13 +214,13 @@ func initaliseLogging() error {
 
 func main() {
 	appDir := "/tmp" // replace with args flag for directory
-	now := time.Now().In(location)
+	now := time.Now().UTC()
 	date := now.Format("2006-01-01")
 	err := checkPrevRuntimes(appDir, date)
 	checkError(err)
 	mkDirAndCD(date)
 
-	err := initaliseLogging()
+	err = initaliseLogging()
 	checkError(err)
 	InfoLogger.Println("Logging initialised")
 
@@ -200,12 +228,18 @@ func main() {
 	//    WarningLogger.Println("There is something you should know about")
 	//    ErrorLogger.Println("Something went wrong")
 
-	urlsToVist, baseDNSurlTotals, err := marshalURLsToMap()
+	stat := Statistics{}
+
+	err = mkDirAndCD(date)
+	checkError(err)
+	saveDirectory := date
+
+	urlsToVisit, baseDNSurlTotals, err := marshalURLsToMap()
 	checkError(err)
 
-	allBaseUrlsSeq := make([]string, 0, len(urlsToVist))
-	for k := range urlsToVist {
-		allBaseUrlsSeq = append(allBaseUrlsArr, k)
+	allBaseUrlsSeq := make([]string, 0, len(urlsToVisit))
+	for _, value := range urlsToVisit {
+		allBaseUrlsSeq = append(strings.Split(value, ""))
 	}
 
 	totalUrls := 0
@@ -215,7 +249,11 @@ func main() {
 		totalUrls = +val
 	}
 
-	err := xtdFFGetNewPages(saveDirectory, allBaseUrlsArr)
+	stat.originalDomains = totalDomains
+	stat.originalUrls = totalUrls
+	stat.totalUrlsVisited += totalUrls
+
+	err = xtdFFGetNewPages(saveDirectory, allBaseUrlsSeq)
 
 	entries, err := os.ReadDir(saveDirectory)
 	checkError(err)
@@ -249,4 +287,3 @@ func main() {
 	}
 
 }
-
