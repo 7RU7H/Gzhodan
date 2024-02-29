@@ -1,19 +1,81 @@
-# Design 
+# Dev
 
-- Find how scarecrow got there picture, needs a good repo picture. 
-- The name is bad. The name needs to be on the Daily Swig level of naming 
-- I want the data to be easy to just hand to another Go lang backend to an AI to do all AI related Software advances the Messlier is hyping me up for not have read emails and news for. A glorious future I will live to enjoy.
+#### Objectives
 
-- package with a gzlop.go so no additional downloads and ensure development of gzlop
-- package with gurl so that is developed.
+- Globally deployable human-like news consumer-aggregator for real human consumption regard CyberSecurity news.
+    - Go for global deployment
+    - xtdotool and firefox for news consumption
+    - Use GoSoup ... unforntunately the one non-std library cannot operate without
+    - Gzlop for tokenised search through Gzhobins binary data map for later cross reference 
+    - Develop human-like computer usage behvaiour library to extend bypassing bot and rate limiting checks 
 
-- Python3 -> GO GO GO - gzlop for the win! for recursive grep-like in go routines and memory arena
-- Just avoid the X/Twitter issues of some of infosec being X/Twitter and x/Twitter is still X/Twitter.
+Therefore the collection is not time sensitive the backend data aggregation, collection and retention is!
+
+Meta/Sub Objectives
+- go std as much as possible - few libraries where possible  
+- Operate as much like a normal user (from the point of a remote site) - develop the Gzombie User library
+- Bypass all future the rate limiting by smart path traversal of complete url list and being slow using a custom cli-browser & curl blend that has jitter and user-agent 
+    - MAC and IP address randomisation  
+- Use and develop Gzlop
+- Prototype Gzhobins
+    - Gzhobins Golang Zombie Hyper Optimise Binaries
+        - Storage format to save artefacts to check the last visited with currect to speedly check difference    
+- Gzombie user library
+
+## TODO
+
+0. Map flowchart to dev chart of development
+1. Get head and teeth into application steps after creative outbursts
+    - Test and Implement as bash first for - visitSites
+        - Nice bash -> Golang os.cmd() for future use
+2. Restructure App
+    - Track app state with application struct
+    - Config File 
+        - Default Config
+    - Segment by phase / purpose - monolith not possible
+    - Config parsing
+    - Application Logging
+    - Storage Logging
+    - Local Article parsing
+    - Zhombrowsing
+    - Application Directory and Data management
+3. GoSoup - Article Parsing
+4. Gzlop - Gzhobins
+    - Backup plan if Gzhobins are too time consuming, or better alternative exists that will be maintained 
+5. Intelligence Correlation ideas...
+
+Pieces then Asynchoronous HARMONY!
+- Logging
+    - application.log - added - implement after completed all features
+    - storage.log
+- App-External Data retention
+    - markdown newletter generation - wait
+    - Directory stucture for: - Done
+        - YEAR-MONTH-DAY.txt    
+- Gzhobins
+- Ingestion
+    - Gzhobins
+- Aggregation-Ingestion
+    - Tokens as a const 
+    - Memory arena hash map regex 
+    - Check *correct article* storage.log file with glzop library
+- Aggregation
+    - Gzlop
+    - Local Article Parsing
+        - https://github.com/anaskhan96/soup - DO NOT USE TO GET ANYTHING - just copy functionality to parse 
+- Intelligence Correlation
+    - `firefox -screenshot $URL --headless --window-size=1920,1080`
 
 
+- Gzombie
+    - Action Sequencer
+    - Jitter that match    
 
-- Gzhobins Golang Zombie Hyper Optimise Binaries
-    - Storage format to save artefacts to check the last visited with currect to speedly check difference    
+Post-Release
+- Aethetics
+- Site changes alert system
+- X/Twitter issues
+ 
 
 
 ####  Dealing with the web application outliner
@@ -42,13 +104,7 @@ https://thehackernews.com/search?max-results=20
 
 https://arstechnica.com/security/
 
-## Objectives
 
-- go std as much as possible - glzop being the except
-- Operate as much like a normal user (from the point of a remote site) - develop the Gzombie User library
-- Bypass all future the rate limiting by smart path traversal of complete url list and being slow using a custom cli-browser & curl blend that has jitter and user-agent 
-    - MAC and IP address randomisation  
-  
 titles links
 
 - Ingestion
@@ -60,8 +116,41 @@ titles links
         
         - Store all urls and summarised statements, Tokens hit! Date, - for self-reference in ingestion and for general collection
 - Printing Terminal colourful friendly Newletter and Markdown friendly 
+ 
 
-## Timeline of TODO
+## Inspirations, Ideas, etc
+
+https://www.digitalocean.com/community/tutorials/how-to-use-dates-and-times-in-go
+
+https://github.com/abiyani/automate-save-page-as/blob/master/save_page_as - ./spa url flags firefox
+
+https://www.educative.io/answers/how-to-implement-a-queue-in-golang
+https://dev.to/vearutop/memory-arenas-in-go-j1f
+
+https://github.com/anaskhan96/soup
+
+
+
+- Use bug bounty screenshotter to get artitical screenshots for markdown report or just 
+- GL with 3 year old web driver for golang that proabbly wont work https://github.com/tebeka/selenium 
+
+## Post Release 
+
+A dump of all future concerns to prevent the distraction of completing a working prototype in Go
+
+#### Issues
+
+- Dealing with Site changes - Site changed warning and alert system
+- X/Twitter is the infosec hivemind, but mastodon and other exist..
+
+
+#### Aethetics
+
+- Gzhodan  || Gzhombr0z3
+- Good picture like Scarecrow.go picture
+## Historic
+
+#### Timeline of TODO
 
 Pieces then Asynchoronous HARMONY!
 
@@ -92,22 +181,22 @@ urls.txt
     - Check *correct article* storage.log file with glzop library
 4. Article parsing 
     - https://github.com/anaskhan96/soup - DO NOT USE TO GET ANYTHING - just copy functionality to parse 
-5. Intelligence coalition 
+5. Intelligence correlation 
     - `firefox -screenshot $URL --headless --window-size=1920,1080`
-        - Also very useful for handing to a AI to look at 
-
-## Inspirations, Ideas, etc
-
-https://www.digitalocean.com/community/tutorials/how-to-use-dates-and-times-in-go
-
-https://github.com/abiyani/automate-save-page-as/blob/master/save_page_as - ./spa url flags firefox
-
-https://www.educative.io/answers/how-to-implement-a-queue-in-golang
-https://dev.to/vearutop/memory-arenas-in-go-j1f
-
-https://github.com/anaskhan96/soup
+        - Also very useful for handing to a AI to look at
 
 
+#### Design Decisions and Ideas
+- Find how scarecrow got there picture, needs a good repo picture. 
+- The name is bad. The name needs to be on the Daily Swig level of naming - Gzhodan / Gzombr0ws3
+- I want the data to be easy to just hand to another Go lang backend to an AI to do all AI related Software advances the Messlier is hyping me up for not have read emails and news for. A glorious future I will live to enjoy.
 
-- Use bug bounty screenshotter to get artitical screenshots for markdown report or just 
-- GL with 3 year old web driver for golang that proabbly wont work https://github.com/tebeka/selenium 
+- package with a gzlop.go so no additional downloads and ensure development of gzlop
+- package with gurl so that is developed.
+
+- Python3 -> GO GO GO - gzlop for the win! for recursive grep-like in go routines and memory arena
+- Just avoid the X/Twitter issues of some of infosec being X/Twitter and x/Twitter is still X/Twitter.
+
+- Gzhobins Golang Zombie Hyper Optimise Binaries
+    - Storage format to save artefacts to check the last visited with currect to speedly check difference    
+

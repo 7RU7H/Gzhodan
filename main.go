@@ -2,8 +2,8 @@ package main
 
 import (
 	"bufio"
-	"encoding/binary"
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ var (
 	ErrorLogger   *log.Logger
 )
 
+// Restructure 
 func checkError(err error) error {
 	if err != nil {
 		fmt.Errorf("%s", err)
@@ -52,13 +54,16 @@ func createFile(filepath string) error {
 }
 
 func checkFileExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	checkError(err)
-	if os.IsNotExist(err) {
-		log.Fatal("File path does not exist")
-		return false, err
-	}
-	return true, nil
+        _, err := os.Stat(path)
+        if err != nil {
+                log.Fatal(err)
+                return false, err
+        }
+        if os.IsNotExist(err) {
+                log.Fatal("File path does not exist")
+                return false, err
+        }
+        return true, nil
 }
 
 // Map = domain + id : url
@@ -286,7 +291,7 @@ func initaliseLogging() error {
 	nameBuilder := strings.Builder{}
 	nameBuilder.WriteString(dateFormatted)
 	nameBuilder.WriteString(".log")
-	file, err := os.OpenFile(nameBuilder.String(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	file, err := os.OpenFile(nameBuilder.String(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0661)
 	if err != nil {
 		log.Fatal(err)
 		return err
@@ -310,8 +315,29 @@ func mkAppDirTree(appDir string, dirTree []string) error {
 	return nil
 }
 
+func trimFilePath(path string) (result string, err error) {
+        os := runtime.GOOS
+        switch os {
+        case "windows":
+                pathSlice := strings.SplitAfterN(path, "\\", -1)
+                result = pathSlice[len(pathSlice)-1]
+        case "linux":
+                pathSlice := strings.SplitAfterN(path, "/", -1)
+                result = pathSlice[len(pathSlice)-1]
+        default:
+                err := fmt.Errorf("unsupported os for filepath trimming of delimited %s", os)
+                checkError(err, 0)
+                return "", err
+        }
+        return result, err
+}
+
+
+
 func main() {
-	appDir := "/tmp" // replace with args flag for directory
+	os := runtime.GOOS
+	tmpDir := os.TempDir()
+	wd, err := os.Getwd()
 	stat := Statistics{}
 	now := time.Now().UTC()
 	stat.date = now.Format("2006-01-01")
@@ -404,7 +430,7 @@ func main() {
 // id index_of_next_chunk  time + domain + urlused + artefacts { urlfound  + titles; artefacts + tokensMatched } terminationStub; 
 
 
-datastream := marshalArtefactstoDS()
+Datastream := marshalArtefactstoDS()
 func writeNewGzhodinToDisk(datastream []bytes) error {
 	extension := ".bin.gzhobin"
 	gzhobinName := ""
