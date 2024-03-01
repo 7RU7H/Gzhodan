@@ -105,8 +105,8 @@ func softConfFFToSaveAlwaysHTMLOnly(testDir string, recursionCounter int) (int, 
 	xdotoolHandle := "xdotool"
 	xdtOpenTerminalAndFirefox := " key ctrl+alt+t sleep 1 type firefox Enter"
 	xdtFindFirefox := " search --onlyvisible --name firefox | head -n 1"
-	xtdClick := " key click 1 "                  //
-	xtdDown := " key Down "                      //
+	xdtClick := " key click 1 "                  //
+	xdtDown := " key Down "                      //
 	xdtTab := " key Tab "                        //
 	xdtGotoFileNaming := " key \"ctrl+l\" type " // needs xdtEnterKey
 	xdtEnterKey := " Return"
@@ -132,7 +132,7 @@ func softConfFFToSaveAlwaysHTMLOnly(testDir string, recursionCounter int) (int, 
 	subCmdBuilder.Reset()
 
 	// Click 1 // to escape writing input for file name - we will return with CTRL+l to then retype any accidentally click input into the Name: input bar
-	subCmdBuilder.WriteString(xtdClick)
+	subCmdBuilder.WriteString(xdtClick)
 	subCmdBuilder.WriteString(xdtEnterKey)
 	initXdoTool.Stdin = strings.NewReader(subCmdBuilder.String())
 	err = initXdoTool.Run()
@@ -148,7 +148,7 @@ func softConfFFToSaveAlwaysHTMLOnly(testDir string, recursionCounter int) (int, 
 	subCmdBuilder.Reset()
 
 	// Down // Selecting Save only html
-	subCmdBuilder.WriteString(xtdDown)
+	subCmdBuilder.WriteString(xdtDown)
 	subCmdBuilder.WriteString(xdtEnterKey)
 	initXdoTool.Stdin = strings.NewReader(subCmdBuilder.String())
 	err = initXdoTool.Run()
@@ -182,7 +182,7 @@ func softConfFFToSaveAlwaysHTMLOnly(testDir string, recursionCounter int) (int, 
 	return recursionCounter, nil
 }
 
-func xtdFFGetNewPages(saveDirectory string, urlArr []string) error {
+func xdtFFGetNewPages(saveDirectory string, urlArr []string) error {
 	xdotoolHandle := "xdotool"
 	xdtOpenTerminalAndFirefox := " key ctrl+alt+t sleep 1 type firefox Enter"
 	xdtFindFirefox := " search --onlyvisible --name firefox | head -n 1"
@@ -382,7 +382,7 @@ func main() {
 	stat.originalUrls = totalUrls
 	stat.totalUrlsVisited += totalUrls
 
-	err = xtdFFGetNewPages(saveDirectory, allBaseUrlsSeq)
+	err = xdtFFGetNewPages(saveDirectory, allBaseUrlsSeq)
 
 
 	// Where the funky code really begins

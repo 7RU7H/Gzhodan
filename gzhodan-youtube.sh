@@ -1,9 +1,15 @@
+#!/bin/bash
+
+
+echo "Input a filename with .csv as the extension" 
+csvFile=$1
+urlAmount=50
 # Guess how many links you are going extract
 # It takes a long time
 # For being non-obfuscatory  add both an echo for the parts
 # And from singular js files for each
 
-
+echo "Minimised JavaScript:"
 echo 'clearInterval(goToBottom);let arrayVideos=[];console.log("\n".repeat(50));const links=document.querySelectorAll("a");for(const e of links)"video-title"===e.id&&(e.href=e.href.split("&list=")[0],arrayVideos.push(e.title+";"+e.href),console.log(e.title+"\t"+e.href));let data=arrayVideos.join("\n"),blob=new Blob([data],{type:"text/csv"}),elem=window.document.createElement("a");elem.href=window.URL.createObjectURL(blob),elem.download="                                 ",document.body.appendChild(elem),elem.click(),document.body.removeChild(elem);'
 
 
@@ -12,27 +18,41 @@ b64ConsolePartOne="Y2xlYXJJbnRlcnZhbChnb1RvQm90dG9tKTsKbGV0IGFycmF5VmlkZW9zID0gW
 
 b64ConsolePartOne="YnOwpkb2N1bWVudC5ib2R5LmFwcGVuZENoaWxkKGVsZW0pOwplbGVtLmNsaWNrKCk7CmRvY3VtZW50LmJvZHkucmVtb3ZlQ2hpbGQoZWxlbSk7"
 
-echo "Input a filename with .csv as the extension" 
-
-csvFilename2b64=$(echo $2 | base64 -w0)
-b64JavaScriptForConsole=$($b64ConsolePartOne $csvFilename2b64 $b64ConsolePartTwo)
+csvFilename2b64=$(echo $csvFile | base64 -w0)
+b64JavaScriptForConsole=$(echo $b64ConsolePartOne $csvFilename2b64 $b64ConsolePartTwo)
 echo b64JavaScriptForConsole | base64 -d
 
 
-xdotool search --onlyvisible --class "firefox" windowactivate --sync key --clearmodifiers 'ctrl+shift+k'
+xdtOpenFFconsole='xdotool search --onlyvisible --class "firefox" windowactivate --sync key --clearmodifiers "ctrl+shift+k"'
+# Bypass firefox anti scam 
 
-# By firefox anti scam 
-# allow pasting 
+xdtBypassFFConsoleScamProtection='type \"allow pasting\""'
+
 # Press enter
 
 
 # Type into console
-'let goToBottom = setInterval(() => window.scrollBy(0, 400), 1000);'
+xdtFFConsoleScrollToPageBottom=" type \"let goToBottom = setInterval(() => window.scrollBy(0, 400), 1000);\"" # Need xdtEnterKey
 # Press enter
 # Wait till reached the bottom
 # for 1000~ it takes
+sleep $urlAmount
 
-echo 'var decodedJavaScript = atob($b64JavaScriptForConsole);'
+xdtFFConsoleScrollToPageBottom=" type \"var decodedJavaScript = atob($b64JavaScriptForConsole);"
 
-'eval(decodedJavaScript);'
+xdtFFConsoleEvalb64JavaScript="type \"eval(decodedJavaScript);\""
+
+
+xdotoolHandle="xdotool"
+xdtOpenTerminalAndFirefox=" key ctrl+alt+t sleep 1 type firefox Enter"
+xdtFindFirefox=" search --onlyvisible --name firefox | head -n 1"
+xdtClick=" key click 1 "                  
+xdtDown=" key Down "                      
+xdtTab=" key Tab "                        
+xdtGotoFileNaming=" key \"ctrl+l\" type " # needs xdtEnterKey
+xdtEnterKey=" Return" # key? 
+xdtSavePageToPath=" key \"ctrl+s\" sleep 2 type " # needs xdtEnterKey
+xdtCloseFirefox=" key --clearmodifiers \"ctrl+F4\""
+
+
 
