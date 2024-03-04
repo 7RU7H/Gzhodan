@@ -22,11 +22,38 @@ Meta/Sub Objectives
         - Storage format to save artefacts to check the last visited with currect to speedly check difference    
 - Gzombie user library
 
-## TODO
+## Gzhombie Style Guide!
 
-0. Map flowchart to dev chart of development
+This I guess, is probably going to be required thinking and development as I go to prevent the de-modularisation by complex single chaining of commands that do more than one ACTION
+
+ISSUE 1 - There is a mathematical law of 3s that states infinite combinations so maybe 2 subactions ending in a (key return) maximum is too strict.
+
+ACTION = x + .. x^nth -> Y : where x is a subactions (use xdotool to open a new terminal and do to a maxium of two things that result in a Return) and x^nth is a Return key (something terminates the set of actions as Action) that Y is simple Result; Whereas open terminal to open firefox to go to a url would be probably too much.
+
+- ISSUE 2 - binary block memory execution that simulate uses is not test by me so the both size and execution and the librarification of blobs that imitate respresentations of users doing something on a computer is just creative theortical dirty protesting my hopes for getting good.
+
+- ISSUE 3 - Even if EDR or AV alerts on use the bulk of the concept here could still just be injected into trust processes as shellcode that looks like user input but the assembly version of what a human is like on a computer is the ultimate 
+
+- Bash 
+- PowerShell
+- C/C++/Rust 
+
+## Issues
+
+- Modularisation hopes are then shifted-up and confined to a dictionary of commands that do X - increasing binary size :( - and making everything less atomic
+- Codium and sh is bad for development M'Kay lessons learnt.
+
+## Todo
+
+- Variablisation is wrong - full commands required 
+
+
+
+## The Plan
+
+0. Map flowchart to dev chart of development - DONE
 1. Get head and teeth into application steps after creative outbursts
-    - Test and Implement as bash first for - visitSites
+    - Test and Implement as bash first for - visitSites - Testing found variablisation is the wrong way especial with Return key requirements and typing
         - Nice bash -> Golang os.cmd() for future use
 2. Restructure App
     - Track app state with application struct

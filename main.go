@@ -184,11 +184,11 @@ func softConfFFToSaveAlwaysHTMLOnly(testDir string, recursionCounter int) (int, 
 
 func xdtFFGetNewPages(saveDirectory string, urlArr []string) error {
 	xdotoolHandle := "xdotool"
-	xdtOpenTerminalAndFirefox := " key ctrl+alt+t sleep 1 type firefox Enter"
+	xdtOpenTerminalAndFirefox := " key \"ctrl+alt+t\" sleep 1 type firefox" // needs xdtEnterKey
 	xdtFindFirefox := " search --onlyvisible --name firefox | head -n 1"
 	xdtGoToURLinFirefox := " key \"ctrl+l\" type " // needs xdtEnterKey
 
-	xdtEnterKey := " Return"
+	xdtEnterKey := "key \"Return\""
 	xdtSavePageToPath := " key \"ctrl+s\" sleep 2 type " // needs xdtEnterKey
 	xdtCloseFirefox := " key --clearmodifiers \"ctrl+F4\""
 
