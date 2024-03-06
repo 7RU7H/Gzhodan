@@ -47,7 +47,7 @@ func createFile(filepath string) error {
 	filePtr, err := os.Create(filepath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "File Creation Error:", err)
-		//log.Fatal(err);
+		checkError(err)	
 	}
 	defer filePtr.Close()
 	return nil
@@ -101,10 +101,8 @@ func marshalURLsToMap() (map[string]string, map[string]int, error) {
 }
 
 func softConfFFToSaveAlwaysHTMLOnly(testDir string, recursionCounter int) (int, error) {
-	pageName := "test.html"
+	pageName := "test"
 
-	// xdtAndReturn := "xdotool key \"Return\""
-	
 	xdtOpenNewTermAndFirefox := "xdotool key \"ctrl+alt+t\" sleep 1 type firefox && xdotool key \"Return\"" 
 	xdtFindFirefox := "xdotool search --onlyvisible --name firefox | head -n 1"
 	xdtClickOnce := "xdotool key click 1 "
@@ -118,56 +116,34 @@ func softConfFFToSaveAlwaysHTMLOnly(testDir string, recursionCounter int) (int, 
 	xdtFindFirefoxAndOpenDevToolsAndAllowPasting := "xdotool search --onlyvisible --class \"firefox\" windowactivate --sync key --clearmodifiers \"ctrl+shift+k\" && xdotool type \"allow pasting\""
 	xdtTypeSomething := "xdotool type \"INSERTKEYPRESSES\" && xdotool key \"Return\"" 
 	
-	subCmdBuilder := strings.Replacer{}
-
 	initXdoTool := exec.Command(xdoOpenNewTermAndFirefox)
 	err := initXdoTool.Run()
 	checkError(err)
 
-
     savePageXdotool := exec.Command(xdtFirefoxOpenSavePage)
-	  err := savePageXdotool.Run()
-	  checkError(err)
+	err := savePageXdotool.Run()
+	checkError(err)
 
-// Full Path replacer
-
-//	xdtTypeFullPath := strings.Replacer(xdtTypeSomething) 
-// Double check directory structure
-	  typeFullPathXdotool := exec.Command(xdtTypeFullPath)
-	  err := typeFullePathXdotool.Run()
-	  checkError(err)
-   // Click 1 // to escape writing input for file name - we will return with CTRL+l to then retype any accidentally click input into the Name: input bar
+	xdtTypeFullPath := strings.Replace(xdtTypeSomething, "INSERTKEYPRESSES", testDir, -1) 
+	typeFullPathXdotool := exec.Command(xdtTypeFullPath)
+	err := typeFullePathXdotool.Run()
+	checkError(err)
+	
+	// Click 1 // to escape writing input for file name - we will return with CTRL+l to then retype any accidentally click input into the Name: input bar
 // The problem with click 1 is where is it clicking need a granteed way to escape to GUI
-	:= exec.Command()
-	err := .Run()
+	escapePathBarXdotool	:= exec.Command()
+	err := escapePathBarXdotool.Run()
 	checkError(err)
 
   // Tab 1 // To move gui to Dropdown on save All, HTML only, text
-	  tabToEscapeToGUIXdotool := exec.Command(xdtKeyTab)
-	  err := tabToEscapeToGUIXdotool.Run()
+	  tabToDropDownXdotool := exec.Command(xdtKeyTab)
+	  err := tabToDropDownXdotool.Run()
 	  checkError(err)
 
       // Down at some point selecting Save only html
       dropDownToSaveOptionXdotool := exec.Command(xdtKeyDown)
 	  err := tabToEscapeToGUIXdotool.Run()
 	  checkError(err)
-
-    
-	subCmdBuilder.WriteString(xdotoolHandle)
-	subCmdBuilder.WriteString(xdtGotoFileNaming)
-	subCmdBuilder.WriteString(testDir)
-	subCmdBuilder.WriteString(pageName)
-	subCmdBuilder.WriteString(xdtEnterKey)
-	initXdoTool.Stdin = strings.NewReader(subCmdBuilder.String())
-	err = initXdoTool.Run()
-	subCmdBuilder.Reset()
-
-	subCmdBuilder.WriteString(xdotoolHandle)
-	subCmdBuilder.WriteString(xdtCloseFirefox)
-	subCmdBuilder.WriteString(xdtEnterKey)
-	initXdoTool.Stdin = strings.NewReader(subCmdBuilder.String())
-	err = initXdoTool.Run()
-	subCmdBuilder.Reset()
 
 	xdtAndFFSaveProperly := false
 	// check if _files or .txt
@@ -181,8 +157,7 @@ func softConfFFToSaveAlwaysHTMLOnly(testDir string, recursionCounter int) (int, 
 }
 
 func xdtFFGetNewPages(saveDirectory string, urlArr []string) error {
-	// xdtAndReturn := "xdotool key \"Return\""
-	
+	var xdtTypeFullPath string
 	xdtOpenNewTermAndFirefox := "xdotool key \"ctrl+alt+t\" sleep 1 type firefox && xdotool key \"Return\"" 
 	xdtFindFirefox := "xdotool search --onlyvisible --name firefox | head -n 1"
 	xdtClickOnce := "xdotool key click 1 "
@@ -196,8 +171,6 @@ func xdtFFGetNewPages(saveDirectory string, urlArr []string) error {
 	xdtFindFirefoxAndOpenDevToolsAndAllowPasting := "xdotool search --onlyvisible --class \"firefox\" windowactivate --sync key --clearmodifiers \"ctrl+shift+k\" && xdotool type \"allow pasting\""
 	xdtTypeSomething := "xdotool type \"INSERTKEYPRESSES\" && xdotool key \"Return\"" 
 
-	subCmdBuilder := strings.Builder{}
-
 	initXdoTool := exec.Command(xdtOpenNewTermAndFirefox)
 	err := initXdoTool.Run()
 	checkError(err)
@@ -207,10 +180,8 @@ func xdtFFGetNewPages(saveDirectory string, urlArr []string) error {
 	checkError(err)
 
 
-	for _, url := range urlArr {
-
-// replacer inline in the Command
-	  goToUrlXdotool := exec.Command(xdtOpenNewTermAndFirefox)
+	for _, url := range urlArr { 
+	  goToUrlXdotool := exec.Command(strings.Replace(xdtFirefoxGoToURL, "INSERTKEYPRESSES",url,-1))
 	  err := goToUrlXdotool.Run()
 	  checkError(err)
 
@@ -218,18 +189,15 @@ func xdtFFGetNewPages(saveDirectory string, urlArr []string) error {
 	  err := savePageXdotool.Run()
 	  checkError(err)
 
-// Full Path replacer
-
-//	xdtTypeFullPath := strings.Replacer(xdtTypeSomething) 
-// Double check directory structure
+	  xdtTypeFullPath = strings.Replace(xdtTypeSomething, "INSERTKEYPRESSES", saveDirectory, -1) 
 	  typeFullPathXdotool := exec.Command(xdtTypeFullPath)
 	  err := typeFullePathXdotool.Run()
 	  checkError(err)
 	}
 
-	  closeFirefoxXdotool := exec.Command(xdtCloseFirefox)
-	  err := closeFirefoxXdotool.Run()
-	  checkError(err)
+	closeFirefoxXdotool := exec.Command(xdtCloseFirefox)
+	err := closeFirefoxXdotool.Run()
+	checkError(err)
 	
 	return nil
 }
