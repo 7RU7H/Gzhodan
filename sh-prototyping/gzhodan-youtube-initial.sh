@@ -23,9 +23,9 @@ youtubePlaylistURL=$3
 xdotoolHandle="xdotool"
 xdtOpenTerminalAndFirefox=" key \"ctrl+alt+t\" sleep 1 type firefox" # needs xdtEnterKey
 xdtFindFirefox=" search --onlyvisible --name firefox | head -n 1"
-xdtClick=" key click 1 "                  
-xdtDown=" key Down "                      
-xdtTab=" key Tab "                        
+xdtClick=" key click 1 "
+xdtDown=" key Down "
+xdtTab=" key Tab "
 xdtGotoURL=" key \"ctrl+l\" type " # needs xdtEnterKey
 xdtEnterKey=" key \"Return\"" # key? 
 xdtSavePageToPath=" key \"ctrl+s\" sleep 2 type " # needs xdtEnterKey
@@ -65,7 +65,3 @@ sleep $urlAmount
 xdtFFConsoleScrollToPageBottom=" type \"var decodedJavaScript = atob($b64JavaScriptForConsole);"
 
 xdtFFConsoleEvalb64JavaScript="type \"eval(decodedJavaScript);\""
-
-
-
-
