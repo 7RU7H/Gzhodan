@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -191,11 +192,13 @@ func main() {
 	os := runtime.GOOS
 	tmpDir := os.TempDir()
 	wd, err := os.Getwd()
+	checkError(err)
 	stat := Statistics{}
 	now := time.Now().UTC()
 	stat.date = now.Format("2006-01-01")
 	stat.year = strconv.Itoa(now.Year())
-	err := checkPrevRuntimes(appDir, stat.date)
+	err = checkPrevRuntimes(appDir, stat.date)
+	checkError(err)
 	dirTree := []string{"test", "logs", "newletters", stat.year}
 	err = mkAppDirTree(appDir, dirTree)
 	checkError(err)
@@ -235,7 +238,7 @@ func main() {
 	stat.originalUrls = totalUrls
 	stat.totalUrlsVisited += totalUrls
 
-	err = xdtFFGetNewPages(saveDirectory, allBaseUrlsSeq)
+	err = curlNewBasePages(allBaseUrlsSeq)
 
 	// Where the funky code really begins
 	entries, err := os.ReadDir(saveDirectory)
@@ -270,4 +273,24 @@ func main() {
 
 	}
 
+}
+
+func curlNewBasePages(urlArr []string) error {
+	var args string = "-K curlrc "
+	urlSlice := strings.Join(urlArr, ",")
+	runCurl := exec.Command("curl", args, urlSlice)
+	err := runCurl.Run()
+	checkError(err)
+	return nil
+}
+
+func curlNewArticles(urlArr []string) error {
+	var args string = "-K curlrc "
+
+	for _, url := range urlArr {
+		runCurl := exec.Command("curl", args, url)
+		err := runCurl.Run()
+		checkError(err)
+	}
+	return nil
 }
