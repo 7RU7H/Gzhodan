@@ -28,7 +28,7 @@ This I guess, is probably going to be required thinking and development as I go 
 
 ISSUE 1 - There is a mathematical law of 3s that states infinite combinations so maybe 2 subactions ending in a (key return) maximum is too strict.
 
-ACTION = x + .. x^nth -> Y : where x is a subactions (use xdotool to open a new terminal and do to a maxium of two things that result in a Return) and x^nth is a Return key (something terminates the set of actions as Action) that Y is simple Result; Whereas open terminal to open firefox to go to a url would be probably too much.
+ACTION = x + .. x^nth -> Y : where x is a suba[text](https://firefox-source-docs.mozilla.org/index.html)ctions (use xdotool to open a new terminal and do to a maxium of two things that result in a Return) and x^nth is a Return key (something terminates the set of actions as Action) that Y is simple Result; Whereas open terminal to open firefox to go to a url would be probably too much.
 
 - ISSUE 2 - binary block memory execution that simulate uses is not test by me so the both size and execution and the librarification of blobs that imitate respresentations of users doing something on a computer is just creative theortical dirty protesting my hopes for getting good.
 
@@ -42,11 +42,14 @@ ACTION = x + .. x^nth -> Y : where x is a subactions (use xdotool to open a new 
 
 - Modularisation hopes are then shifted-up and confined to a dictionary of commands that do X - increasing binary size :( - and making everything less atomic
 - Codium and sh is bad for development M'Kay lessons learnt.
+- xdotool saveas click or GUI variation issues  
+
+
+- Curl out a backup plan with curl
 
 ## Todo
 
 - Variablisation is wrong - full commands required 
-
 
 
 ## The Plan
