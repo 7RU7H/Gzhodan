@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"log"
@@ -205,9 +204,9 @@ func curlNewArticles(urlArr []string) error {
 	return nil
 }
 func main() {
-	os := runtime.GOOS
+	currentOS := runtime.GOOS
 	tmpDir := os.TempDir()
-	wd, err := os.Getwd()
+	appDir, err := os.Getwd()
 	checkError(err)
 	stat := Statistics{}
 	now := time.Now().UTC()
@@ -256,6 +255,7 @@ func main() {
 	checkError(err)
 	// stdout -> 4 base pages
 	findLinksAndTitleFromBasePages(basePagesStdoutMap)
+
 	// regexp links and page titles
 	//  ---- Domain Specifics:
 	// portswigger -> links are just title strings.Join(titleNoAtags, "-")
@@ -264,6 +264,7 @@ func main() {
 	// thehackernews
 	//
 	// compare maps for domain against previous enumerated list file with gzlop
+	err = compareBasePagesToHistoricData()
 	// ---- only need to store and compare urls
 	// if in the file remove from map
 	// Storage 2 files one .csv per run and collective with Page rating, time, url, matched tokens, And just previous-urls-found-only.list
@@ -276,36 +277,37 @@ func main() {
 	entries, err := os.ReadDir(saveDirectory)
 	checkError(err)
 
-	var todaysInitialPages []string
+}
 
-	//allTheArtefacts := make(map[int]map[int]string)
+func compareBasePagesToHistoricData(historicUrlsFile, tokensFile string, urlsFound map[string]string) error {
+	var urlsAsBytes []byte
 
-	for _, entry := range entries {
-		todaysInitialPages = append(entries, entry.Name())
+	file, err := os.ReadFile(historicUrlsFile)
+	checkError(err)
+
+	for _, url := range urlsFound {
+		urlAsBytes := []byte(url)
+		append(urlsAsBytes, urlAsBytes[:])
 	}
-	for _, pathToFile := range todaysInitialPages {
-		file, err := os.ReadFile(pathToFile)
+
+	searchTokens, err := os.ReadFile(tokensFile)
+	checkError(err)
+	// TODO
+
+	// map memory - for the same ~~paragraph~~ search for dates, url and tokens
+	// soup go gets all the fields that have urls like gospider (CHECK HOW THAT WORK and do it locally)
+	// gzlop buffer can then be adapter to search the buffer from address to offset for EVEN MORE SPEED
+
+	// Naive Search for a token
+
+	allTheArtefacts := make(map[int]map[int]string)
+	for _, token := range searchTokens {
+		artifacts, err := gzlopBuffer(file, token)
 		checkError(err)
-		defer file.Close()
-
-		// TODO
-
-		// map memory - for the same ~~paragraph~~ search for dates, url and tokens
-		// soup go gets all the fields that have urls like gospider (CHECK HOW THAT WORK and do it locally)
-		// gzlop buffer can then be adapter to search the buffer from address to offset for EVEN MORE SPEED
-
-		buffer := bytes.NewBuffer()
-
-		// Naive Search for a token
-		for _, token := range searchTokens {
-			artifacts, err := gzlopBuffer(buffer, token)
-			checkError(err)
-			allTheArtefacts[token] = artifacts
-		}
-		//
-		// BRAIN NEED THUNK HERE
-		//
-
+		allTheArtefacts[token] = artifacts
 	}
+	//
+	// BRAIN NEED THUNK HERE
+	//
 
 }
