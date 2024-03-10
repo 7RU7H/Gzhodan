@@ -14,8 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/anaskhan96/soup"
 )
 
 type Statistics struct {
@@ -45,7 +43,6 @@ func checkError(err error) error {
 func siteSpecificsHandler(domain string) {
 	switch domain {
 	case "arstechnica.com":
-	case "news.ycombinator.com":
 	case "portswigger.net":
 	case "thehackernews.com":
 	case "www.sans.org":
@@ -187,7 +184,26 @@ func trimFilePath(path string) (result string, err error) {
 	}
 	return result, err
 }
+func curlNewBasePages(urlArr []string) (map[string]string, error) {
+	var args string = "-K curlrc -L "
+	result := make(map[string]string)
+	for _, url := range urlArr {
+		runCurl := exec.Command("curl", args, url)
+		outputBytes, err := runCurl.Output()
+		checkError(err)
+		result[url] = string(outputBytes[:])
+	}
+	return result, nil
+}
 
+func curlNewArticles(urlArr []string) error {
+	var args string = "-K curlrc -L -O"
+	urlsStr := strings.Join(urlArr, " ")
+	runCurl := exec.Command("curl", args, urlsStr)
+	err := runCurl.Run()
+	checkError(err)
+	return nil
+}
 func main() {
 	os := runtime.GOOS
 	tmpDir := os.TempDir()
@@ -203,8 +219,6 @@ func main() {
 	err = mkAppDirTree(appDir, dirTree)
 	checkError(err)
 	testDirFP := filepath.Join(appDir, "test")
-	softConfFFToSaveAlwaysHTMLOnly(testDirFP, 0)
-	checkError(err)
 	mkDirAndCD(stat.date)
 
 	err = initaliseLogging()
@@ -238,15 +252,36 @@ func main() {
 	stat.originalUrls = totalUrls
 	stat.totalUrlsVisited += totalUrls
 
-	err = curlNewBasePages(allBaseUrlsSeq)
+	basePagesStdoutMap, err := curlNewBasePages(allBaseUrlsSeq)
+	checkError(err)
+	// stdout -> 4 base pages
+	findLinksAndTitleFromBasePages(basePagesStdoutMap)
+	// regexp links and page titles
+	//  ---- Domain Specifics:
+	// portswigger -> links are just title strings.Join(titleNoAtags, "-")
+	// sans
+	// arstechnica
+	// thehackernews
+	//
+	// compare maps for domain against previous enumerated list file with gzlop
+	// ---- only need to store and compare urls
+	// if in the file remove from map
+	// Storage 2 files one .csv per run and collective with Page rating, time, url, matched tokens, And just previous-urls-found-only.list
+	//
+	// Get new Pages
+	err = curlNewArticles(finalUrlsArr)
+	// Print Alert - similiar to each row of .csv of urls
 
 	// Where the funky code really begins
 	entries, err := os.ReadDir(saveDirectory)
 	checkError(err)
+
 	var todaysInitialPages []string
-	allTheArtefacts := make(map[int]map[int]string)
+
+	//allTheArtefacts := make(map[int]map[int]string)
+
 	for _, entry := range entries {
-		todaysInitialPages = append(files, entry.Name())
+		todaysInitialPages = append(entries, entry.Name())
 	}
 	for _, pathToFile := range todaysInitialPages {
 		file, err := os.ReadFile(pathToFile)
@@ -254,12 +289,12 @@ func main() {
 		defer file.Close()
 
 		// TODO
+
 		// map memory - for the same ~~paragraph~~ search for dates, url and tokens
 		// soup go gets all the fields that have urls like gospider (CHECK HOW THAT WORK and do it locally)
 		// gzlop buffer can then be adapter to search the buffer from address to offset for EVEN MORE SPEED
-		buffer := bytes.NewBuffer()
 
-		doc := soup.HTMLParse(string(file))
+		buffer := bytes.NewBuffer()
 
 		// Naive Search for a token
 		for _, token := range searchTokens {
@@ -273,24 +308,4 @@ func main() {
 
 	}
 
-}
-
-func curlNewBasePages(urlArr []string) error {
-	var args string = "-K curlrc "
-	urlSlice := strings.Join(urlArr, ",")
-	runCurl := exec.Command("curl", args, urlSlice)
-	err := runCurl.Run()
-	checkError(err)
-	return nil
-}
-
-func curlNewArticles(urlArr []string) error {
-	var args string = "-K curlrc "
-
-	for _, url := range urlArr {
-		runCurl := exec.Command("curl", args, url)
-		err := runCurl.Run()
-		checkError(err)
-	}
-	return nil
 }
