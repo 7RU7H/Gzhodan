@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"log"
@@ -31,6 +32,8 @@ var (
 	WarningLogger *log.Logger
 	InfoLogger    *log.Logger
 	ErrorLogger   *log.Logger
+	// Bad Globals till I decide on flags, or modules
+	TokenFilePathGlobal = fmt.Sprintf(os.Getwd(), "tokens.txt")
 )
 
 // Restructure
@@ -43,8 +46,16 @@ func checkError(err error) error {
 	return err
 }
 
-func siteSpecificsHandler(domain string) {
-	switch domain {
+func keyToDomainString(keyUrl string) (string, error) {
+	parsedURL, err := url.Parse(keyUrl)
+	if err != nil {
+		fmt.Errorf("invalid url: %s\n", keyUrl)
+		checkError(err)
+	}
+
+	hostname := parsedURL.Hostname()
+
+	switch hostname {
 	case "arstechnica.com":
 	case "portswigger.net":
 	case "thehackernews.com":
@@ -52,6 +63,7 @@ func siteSpecificsHandler(domain string) {
 	default:
 
 	}
+	return hostname, nil
 }
 
 func createFile(filepath string) error {
@@ -208,9 +220,90 @@ func curlNewArticles(urlArr []string) error {
 	checkError(err)
 	return nil
 }
+func gzlopBuffer(buffer *bytes.Buffer, patterns []byte) (map[int]string, error) {
+	patCount := int(0)
+	artifacts := make(map[int]string)
+	builder := strings.Builder{}
+	scanner := bufio.NewScanner(buffer)
+	for scanner.Scan() {
+		for i := 0; i <= len(patterns)-1; i++ {
+			if bytes.Contains(scanner.Bytes(), []byte{patterns[i]}) {
+				patCount++
+				builder.WriteString(string(patterns[i]))
+				artifacts[patCount] = builder.String()
+				builder.Reset()
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+	return artifacts, nil
+}
 
-func findLinksAndTitlesFromBasePages(basePagesStdoutMap map[string]string) error {
-	return nil
+func getTokensFileContentsAsBytes() ([]byte, error) {
+	var tokenFileAsBytes []byte
+	exists, err := checkFileExists(TokenFilePathGlobal)
+	checkError(err)
+	if !exists {
+		// tokens file path does not exist
+	} else {
+		file, err := os.Open("file.txt")
+		checkError(err)
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := scanner.Text()
+			words := strings.Fields(line)
+			for _, word := range words {
+				tokenFileAsBytes = append(tokenFileAsBytes, []byte(word)...)
+			}
+		}
+	}
+	return tokenFileAsBytes, nil
+}
+
+func findLinksAndTitlesFromBasePages(basePagesStdoutMap map[string]string) (map[string]map[int]string, error) {
+
+	arstechnicaTokensMap, portswiggerTokensMap, thehackernewsTokensMap, sansTokensMap := make(map[int]string), make(map[int]string), make(map[int]string), make(map[int]string)
+	// regexp links and page titles
+	//  ---- Domain Specifics:
+	for key, value := range basePagesStdoutMap {
+		domain, err := keyToDomainString(key)
+		checkError(err)
+
+		webPageBuffer := bytes.NewBuffer([]byte(value))
+		tokens, err := getTokensFileContentsAsBytes(TokenFilePathGlobal)
+		checkError(err)
+		switch domain {
+		// sans
+		// arstechnica
+		// thehackernews
+		//
+		case "arstechnica.com":
+			arstechnicaTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
+			checkError(err)
+		case "portswigger.net": // portswigger -> links are just title strings.Join(titleNoAtags, "-")
+			portswiggerTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
+			checkError(err)
+		case "thehackernews.com":
+			thehackernewsTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
+			checkError(err)
+		case "www.sans.org":
+			sansTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
+			checkError(err)
+		case "":
+			err := fmt.Errorf("strange race condition occur with domain variable being an empty string")
+			checkError(err)
+		default:
+
+		}
+		domain = ""
+	}
+	resultMap := make(map[string]map[int]string)
+	resultMap["arstechnica.com"], resultMap["portswigger.net"], resultMap["thehackernews.com"], resultMap["www.sans.org"] = arstechnicaTokensMap, portswiggerTokensMap, thehackernewsTokensMap, sansTokensMap
+
+	return resultMap, nil
 }
 
 func main() {
@@ -262,13 +355,6 @@ func main() {
 
 	findLinksAndTitlesFromBasePages(basePagesStdoutMap)
 
-	// regexp links and page titles
-	//  ---- Domain Specifics:
-	// portswigger -> links are just title strings.Join(titleNoAtags, "-")
-	// sans
-	// arstechnica
-	// thehackernews
-	//
 	// compare maps for domain against previous enumerated list file with gzlop
 	err = compareBasePagesToHistoricData()
 	// ---- only need to store and compare urls
