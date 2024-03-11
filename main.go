@@ -16,6 +16,10 @@ import (
 )
 
 type Statistics struct {
+	os               string
+	appDir           string
+	tmpDir           string
+	testDir          string
 	originalDomains  int
 	originalUrls     int
 	totalUrlsVisited int
@@ -71,6 +75,24 @@ func checkFileExists(path string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// InfoLogger.Printf("Something noteworthy happened\n")
+// WarningLogger.Printf("There is something you should know about\n")
+// ErrorLogger.Printf("Something went wrong\n")
+func initaliseLogging() error {
+	now := time.Now().UTC()
+	dateFormatted := now.Format("2006-01-01")
+	nameBuilder := strings.Builder{}
+	nameBuilder.WriteString(dateFormatted)
+	nameBuilder.WriteString(".log")
+	file, err := os.OpenFile(nameBuilder.String(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0661)
+	checkError(err)
+
+	InfoLogger = log.New(file, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	WarningLogger = log.New(file, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
+	ErrorLogger = log.New(file, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+	return nil
 }
 
 // Map = domain + id : url
@@ -137,24 +159,6 @@ func checkPrevRuntimes(appDir, date string) error {
 	return nil
 }
 
-func initaliseLogging() error {
-	now := time.Now().UTC()
-	dateFormatted := now.Format("2006-01-01")
-	nameBuilder := strings.Builder{}
-	nameBuilder.WriteString(dateFormatted)
-	nameBuilder.WriteString(".log")
-	file, err := os.OpenFile(nameBuilder.String(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0661)
-	if err != nil {
-		log.Fatal(err)
-		return err
-	}
-
-	InfoLogger = log.New(file, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
-	WarningLogger = log.New(file, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
-	ErrorLogger = log.New(file, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
-	return nil
-}
-
 func mkAppDirTree(appDir string, dirTree []string) error {
 	var PathAndName string
 	for _, dirName := range dirTree {
@@ -178,11 +182,12 @@ func trimFilePath(path string) (result string, err error) {
 		result = pathSlice[len(pathSlice)-1]
 	default:
 		err := fmt.Errorf("unsupported os for filepath trimming of delimited %s", os)
-		checkError(err, 0)
+		checkError(err)
 		return "", err
 	}
 	return result, err
 }
+
 func curlNewBasePages(urlArr []string) (map[string]string, error) {
 	var args string = "-K curlrc -L "
 	result := make(map[string]string)
@@ -203,30 +208,30 @@ func curlNewArticles(urlArr []string) error {
 	checkError(err)
 	return nil
 }
+
+func findLinksAndTitlesFromBasePages(basePagesStdoutMap map[string]string) error {
+	return nil
+}
+
 func main() {
-	currentOS := runtime.GOOS
-	tmpDir := os.TempDir()
 	appDir, err := os.Getwd()
 	checkError(err)
 	stat := Statistics{}
+	stat.os = runtime.GOOS
+	stat.tmpDir = os.TempDir()
+	stat.appDir = appDir
 	now := time.Now().UTC()
 	stat.date = now.Format("2006-01-01")
 	stat.year = strconv.Itoa(now.Year())
-	err = checkPrevRuntimes(appDir, stat.date)
+	err = checkPrevRuntimes(stat.appDir, stat.date)
 	checkError(err)
 	dirTree := []string{"test", "logs", "newletters", stat.year}
-	err = mkAppDirTree(appDir, dirTree)
+	err = mkAppDirTree(stat.appDir, dirTree)
 	checkError(err)
-	testDirFP := filepath.Join(appDir, "test")
-	mkDirAndCD(stat.date)
-
+	stat.testDir = filepath.Join(appDir, "test")
 	err = initaliseLogging()
 	checkError(err)
-	InfoLogger.Println("Logging initialised")
-
-	//    InfoLogger.Println("Something noteworthy happened")
-	//    WarningLogger.Println("There is something you should know about")
-	//    ErrorLogger.Println("Something went wrong")
+	InfoLogger.Printf("Logging initialised")
 
 	err = mkDirAndCD(stat.date)
 	checkError(err)
@@ -251,10 +256,11 @@ func main() {
 	stat.originalUrls = totalUrls
 	stat.totalUrlsVisited += totalUrls
 
+	// stdout -> 4 base pages
 	basePagesStdoutMap, err := curlNewBasePages(allBaseUrlsSeq)
 	checkError(err)
-	// stdout -> 4 base pages
-	findLinksAndTitleFromBasePages(basePagesStdoutMap)
+
+	findLinksAndTitlesFromBasePages(basePagesStdoutMap)
 
 	// regexp links and page titles
 	//  ---- Domain Specifics:
