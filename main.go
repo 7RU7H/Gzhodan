@@ -263,11 +263,17 @@ func getTokensFileContentsAsBytes() ([]byte, error) {
 	return tokenFileAsBytes, nil
 }
 
+// TODO site specifics
+//
+// findTokensOnPage() != findLinksAndTitlesFromBasePages
+//
+// gzlopGetHtmlTagAndLink()
+// search -> reborderise -> then back
+// search -> reborderise -> then forward
+
 func findLinksAndTitlesFromBasePages(basePagesStdoutMap map[string]string) (map[string]map[int]string, error) {
 
 	arstechnicaTokensMap, portswiggerTokensMap, thehackernewsTokensMap, sansTokensMap := make(map[int]string), make(map[int]string), make(map[int]string), make(map[int]string)
-	// regexp links and page titles
-	//  ---- Domain Specifics:
 	for key, value := range basePagesStdoutMap {
 		domain, err := keyToDomainString(key)
 		checkError(err)
