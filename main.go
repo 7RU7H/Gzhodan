@@ -33,7 +33,7 @@ var (
 	InfoLogger    *log.Logger
 	ErrorLogger   *log.Logger
 	// Bad Globals till I decide on flags, or modules
-	TokenFilePathGlobal = fmt.Sprintf(os.Getwd(), "tokens.txt")
+	TokenFilePathGlobal string
 )
 
 // Restructure
@@ -212,6 +212,7 @@ func curlNewBasePages(urlArr []string) (map[string]string, error) {
 	return result, nil
 }
 
+// Does this really need to be -O
 func curlNewArticles(urlArr []string) error {
 	var args string = "-K curlrc -L -O"
 	urlsStr := strings.Join(urlArr, " ")
@@ -220,6 +221,7 @@ func curlNewArticles(urlArr []string) error {
 	checkError(err)
 	return nil
 }
+
 func gzlopBuffer(buffer *bytes.Buffer, patterns []byte) (map[int]string, error) {
 	patCount := int(0)
 	artifacts := make(map[int]string)
@@ -314,7 +316,9 @@ func findLinksAndTitlesFromBasePages(basePagesStdoutMap map[string]string) (map[
 
 func main() {
 	appDir, err := os.Getwd()
-	checkError(err)
+	if err != nil {
+		checkError(err)
+	}
 	stat := Statistics{}
 	stat.os = runtime.GOOS
 	stat.tmpDir = os.TempDir()
@@ -323,22 +327,31 @@ func main() {
 	stat.date = now.Format("2006-01-01")
 	stat.year = strconv.Itoa(now.Year())
 	err = checkPrevRuntimes(stat.appDir, stat.date)
-	checkError(err)
+	if err != nil {
+		checkError(err)
+	}
 	dirTree := []string{"test", "logs", "newletters", stat.year}
 	err = mkAppDirTree(stat.appDir, dirTree)
-	checkError(err)
+	if err != nil {
+		checkError(err)
+	}
 	stat.testDir = filepath.Join(appDir, "test")
 	err = initaliseLogging()
-	checkError(err)
+	if err != nil {
+		checkError(err)
+	}
 	InfoLogger.Printf("Logging initialised")
 
 	err = mkDirAndCD(stat.date)
-	checkError(err)
+	if err != nil {
+		checkError(err)
+	}
 	saveDirectory := stat.date
 
 	urlsToVisit, baseDNSurlTotals, err := marshalURLsToMap()
-	checkError(err)
-
+	if err != nil {
+		checkError(err)
+	}
 	allBaseUrlsSeq := make([]string, 0, len(urlsToVisit))
 	for _, value := range urlsToVisit {
 		allBaseUrlsSeq = append(strings.Split(value, ""))
@@ -357,7 +370,28 @@ func main() {
 
 	// stdout -> 4 base pages
 	basePagesStdoutMap, err := curlNewBasePages(allBaseUrlsSeq)
-	checkError(err)
+	if err != nil {
+		checkError(err)
+	}
+
+	//
+	// URL:TITLE linked go routined control flow FOR EACH URL parentFunc -> urlNamed (I want it to scale and not have to hardcode each) -> flow from A -> Z
+	// - Scalable,
+
+	// create maps for each base pages
+
+	// go routine a for loop that value of the basePagesStdoutMap is passed instead
+
+	// Get all links and titles
+
+	// Compare against historic file of links and titles
+	// - File for each
+
+	// Curl pages to memory and search for tokens
+
+	// Output cli, file and (backup and then) organise historic data
+
+	// Review below:
 
 	findLinksAndTitlesFromBasePages(basePagesStdoutMap)
 

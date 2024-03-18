@@ -1,5 +1,6 @@
 # Dev
 
+
 #### Objectives
 
 - Globally deployable human-like news consumer-aggregator for real human consumption regard CyberSecurity news.
