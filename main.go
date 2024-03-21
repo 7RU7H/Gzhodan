@@ -273,47 +273,6 @@ func getTokensFileContentsAsBytes() ([]byte, error) {
 // search -> reborderise -> then back
 // search -> reborderise -> then forward
 
-func findLinksAndTitlesFromBasePages(basePagesStdoutMap map[string]string) (map[string]map[int]string, error) {
-
-	arstechnicaTokensMap, portswiggerTokensMap, thehackernewsTokensMap, sansTokensMap := make(map[int]string), make(map[int]string), make(map[int]string), make(map[int]string)
-	for key, value := range basePagesStdoutMap {
-		domain, err := keyToDomainString(key)
-		checkError(err)
-
-		webPageBuffer := bytes.NewBuffer([]byte(value))
-		tokens, err := getTokensFileContentsAsBytes(TokenFilePathGlobal)
-		checkError(err)
-		switch domain {
-		// sans
-		// arstechnica
-		// thehackernews
-		//
-		case "arstechnica.com":
-			arstechnicaTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
-			checkError(err)
-		case "portswigger.net": // portswigger -> links are just title strings.Join(titleNoAtags, "-")
-			portswiggerTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
-			checkError(err)
-		case "thehackernews.com":
-			thehackernewsTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
-			checkError(err)
-		case "www.sans.org":
-			sansTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
-			checkError(err)
-		case "":
-			err := fmt.Errorf("strange race condition occur with domain variable being an empty string")
-			checkError(err)
-		default:
-
-		}
-		domain = ""
-	}
-	resultMap := make(map[string]map[int]string)
-	resultMap["arstechnica.com"], resultMap["portswigger.net"], resultMap["thehackernews.com"], resultMap["www.sans.org"] = arstechnicaTokensMap, portswiggerTokensMap, thehackernewsTokensMap, sansTokensMap
-
-	return resultMap, nil
-}
-
 func main() {
 	appDir, err := os.Getwd()
 	if err != nil {
@@ -358,13 +317,12 @@ func main() {
 	}
 
 	totalUrls := 0
-	totalDomains := len(baseDNSurlTotals) - 1
+	stat.originalDomains = len(baseDNSurlTotals) - 1
 
 	for _, val := range baseDNSurlTotals {
 		totalUrls = +val
 	}
 
-	stat.originalDomains = totalDomains
 	stat.originalUrls = totalUrls
 	stat.totalUrlsVisited += totalUrls
 
@@ -373,6 +331,14 @@ func main() {
 	if err != nil {
 		checkError(err)
 	}
+
+	getAllTitlesAndLinks(basePagesStdoutMap)
+	finalTitlesAndLinks := compareTitlesAndLinksToHistoricData()
+
+	go func() {
+		curlNewArticles()
+		assessPage()
+	}()
 
 	//
 	// URL:TITLE linked go routined control flow FOR EACH URL parentFunc -> urlNamed (I want it to scale and not have to hardcode each) -> flow from A -> Z
@@ -390,13 +356,8 @@ func main() {
 	// Curl pages to memory and search for tokens
 
 	// Output cli, file and (backup and then) organise historic data
-
-	// Review below:
-
-	findLinksAndTitlesFromBasePages(basePagesStdoutMap)
-
 	// compare maps for domain against previous enumerated list file with gzlop
-	err = compareBasePagesToHistoricData()
+
 	// ---- only need to store and compare urls
 	// if in the file remove from map
 	// Storage 2 files one .csv per run and collective with Page rating, time, url, matched tokens, And just previous-urls-found-only.list
@@ -411,7 +372,48 @@ func main() {
 
 }
 
-func compareBasePagesToHistoricData(historicUrlsFile, tokensFile string, urlsFound map[string]string) error {
+func getAllTitlesAndLinks(basePagesStdoutMap map[string]string) (map[string]map[int]string, error) {
+
+	arstechnicaTokensMap, portswiggerTokensMap, thehackernewsTokensMap, sansTokensMap := make(map[int]string), make(map[int]string), make(map[int]string), make(map[int]string)
+	for key, value := range basePagesStdoutMap {
+		domain, err := keyToDomainString(key)
+		checkError(err)
+
+		webPageBuffer := bytes.NewBuffer([]byte(value))
+		tokens, err := getTokensFileContentsAsBytes(TokenFilePathGlobal)
+		checkError(err)
+		switch domain {
+		// sans
+		// arstechnica
+		// thehackernews
+		//
+		case "arstechnica.com":
+			arstechnicaTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
+			checkError(err)
+		case "portswigger.net": // portswigger -> links are just title strings.Join(titleNoAtags, "-")
+			portswiggerTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
+			checkError(err)
+		case "thehackernews.com":
+			thehackernewsTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
+			checkError(err)
+		case "www.sans.org":
+			sansTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
+			checkError(err)
+		case "":
+			err := fmt.Errorf("strange race condition occur with domain variable being an empty string")
+			checkError(err)
+		default:
+
+		}
+		domain = ""
+	}
+	resultMap := make(map[string]map[int]string)
+	resultMap["arstechnica.com"], resultMap["portswigger.net"], resultMap["thehackernews.com"], resultMap["www.sans.org"] = arstechnicaTokensMap, portswiggerTokensMap, thehackernewsTokensMap, sansTokensMap
+
+	return resultMap, nil
+}
+
+func compareTitlesAndLinksToHistoricData(historicUrlsFile, tokensFile string, urlsFound map[string]string) error {
 	var urlsAsBytes []byte
 
 	file, err := os.ReadFile(historicUrlsFile)
