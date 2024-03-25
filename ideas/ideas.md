@@ -1,3 +1,12 @@
+
+
+
+- use a database to store information
+- configuration file for gzhodan
+- make curlrc -> cmd.Exec more jitter friendly
+- file hashing for comparisons
+
+
 ```go
 func softConfFFToSaveAlwaysHTMLOnly(testDir string, recursionCounter int) (int, error) {
 	pageName := "test"

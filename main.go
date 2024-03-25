@@ -349,6 +349,9 @@ func main() {
 	// go routine a for loop that value of the basePagesStdoutMap is passed instead
 
 	// Get all links and titles
+	//
+	// Get new Pages
+	err = curlNewArticles(finalUrlsArr)
 
 	// Compare against historic file of links and titles
 	// - File for each
@@ -356,14 +359,16 @@ func main() {
 	// Curl pages to memory and search for tokens
 
 	// Output cli, file and (backup and then) organise historic data
-	// compare maps for domain against previous enumerated list file with gzlop
+	err = selectOutput(outputArgs)
+	if err != nil {
+		checkError(err)
+	}
 
 	// ---- only need to store and compare urls
 	// if in the file remove from map
 	// Storage 2 files one .csv per run and collective with Page rating, time, url, matched tokens, And just previous-urls-found-only.list
-	//
-	// Get new Pages
-	err = curlNewArticles(finalUrlsArr)
+	// compare maps for domain against previous enumerated list file with gzlop
+
 	// Print Alert - similiar to each row of .csv of urls
 
 	// Where the funky code really begins
@@ -446,16 +451,6 @@ func compareTitlesAndLinksToHistoricData(historicUrlsFile, tokensFile string, ur
 	return nil
 }
 
-// Output cli, file and (backup and then) organise historic data
-
-// verboseOutput - markdown + verbose markdown report, cli is verbose
-
-// cliOnlyOutput
-
-// markdownOnlyOutput
-
-// defaultOutput - markdown, cli non-verbose
-
 func selectOutput(args []string) error {
 	argsSize := len(strings.Join(args, ""))
 	var argsId int
@@ -501,7 +496,6 @@ func selectOutput(args []string) error {
 }
 
 // verboseOutput - markdown + verbose markdown report, cli is verbose
-
 func verboseOutput() {
 
 }
