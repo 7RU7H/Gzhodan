@@ -443,5 +443,87 @@ func compareTitlesAndLinksToHistoricData(historicUrlsFile, tokensFile string, ur
 	//
 	// BRAIN NEED THUNK HERE
 	//
+	return nil
+}
+
+// Output cli, file and (backup and then) organise historic data
+
+// verboseOutput - markdown + verbose markdown report, cli is verbose
+
+// cliOnlyOutput
+
+// markdownOnlyOutput
+
+// defaultOutput - markdown, cli non-verbose
+
+func selectOutput(args []string) error {
+	argsSize := len(strings.Join(args, ""))
+	var argsId int
+	if argsSize != 0 {
+		for _, arg := range args {
+			switch arg {
+			case "verbose":
+				argsId += 1
+			case "cli":
+				argsId += 2
+			case "markdown":
+				argsId += 5
+
+			default:
+				err := fmt.Errorf("invalid output arguments provide: %v ; from slice of size: %v with the contents: %v", arg, argsSize, args)
+				checkError(err)
+				return err
+			}
+		}
+	} else {
+		argsId = argsSize
+	}
+	switch argsId {
+	case 1: // verbose
+		verboseOutput()
+	case 2: // cli only
+		cliOnlyOutput()
+	case 3: // verbose cli only
+		verboseCliOutput()
+	case 5: // markdown only
+		markdownOnlyOutput()
+	case 6: // verbose markdown
+		verboseMarkdownOutput()
+	case 0:
+		defaultOutput()
+	default:
+		err := fmt.Errorf("invalid arg idenfier counted %v", argsId)
+		checkError(err)
+		return err
+	}
+	return nil
+
+}
+
+// verboseOutput - markdown + verbose markdown report, cli is verbose
+
+func verboseOutput() {
+
+}
+
+func cliOnlyOutput() {
+
+}
+
+func markdownOnlyOutput() {
+
+}
+
+func verboseCliOutput() {
+
+}
+
+func verboseMarkdownOutput() {
+
+}
+
+// defaultOutput - cli some statistics and markdown report
+
+func defaultOutput() {
 
 }
