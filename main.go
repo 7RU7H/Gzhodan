@@ -345,7 +345,7 @@ func main() {
 	finalTitlesAndLinks, err := compareArtefactsToHistoricData()
 
 	// Compare against historic file of links and titles
-	// - File for each
+	// - File for each? 
 
 	//
 
