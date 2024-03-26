@@ -265,13 +265,43 @@ func getTokensFileContentsAsBytes() ([]byte, error) {
 	return tokenFileAsBytes, nil
 }
 
-// TODO site specifics
-//
-// findTokensOnPage() != findLinksAndTitlesFromBasePages
-//
-// gzlopGetHtmlTagAndLink()
-// search -> reborderise -> then back
-// search -> reborderise -> then forward
+// Add to nestedStrStrMap is just a better styled answer from: https://stackoverflow.com/questions/64918219/how-to-assign-to-a-nested-map
+// Iterating over nested String maps - 1st is the [DOMAIN] so prints keys and values as key:value; 2nd prints just the values of [Domain][url]VALUE
+// for _, mapKey := range testmap { fmt.Println(url)	}
+// for _, key := range testmap["portswigger"] {fmt.Println(url)	}
+func addValueToNestedStrStrMap(parentMap map[string]map[string]string, parentKey, childKey string, nestedValue string) {
+    childMap := parentMap[parentKey]
+	if childMap == nil {
+		childMap = make(map[string]string)
+		parentMap[parentKey] = childMap
+	}
+	childMap[childKey] = nestedValue
+}
+
+
+// https://www.tutorialspoint.com/golang-program-to-convert-file-to-byte-array
+func loadTokensIntoMem(path string) (error, int ,[]bytes) {
+	tokensFile, err := os.Open(path)
+	if err != nil {
+		checkErr(err)
+	}
+	defer tokensFile.Close()
+
+	stat, err := tokensFile.Stat()
+	if err != nil {
+		checkErr(err)
+	}
+	
+	byteSlice := make([]byte, stat.Size())
+	_, err = bufio.NewReader(tokensFile).Read(byteSlice)
+	if err != nil && err != io.EOF {
+		checkError(err)
+		return err, 0, nil
+	}
+	bsSize = len(byteSlice)
+	return nil, bsSize, byteSlice
+}
+
 
 func main() {
 	appDir, err := os.Getwd()
@@ -348,18 +378,15 @@ func main() {
 	go func() {
 		titleCheckResult, err = parseTitles(tokenOffset)
 		if !titleCheckResult {
-			// Dump url and titles from application memory
-			failedLinksAndTitleByDomainMap[domain] = make(map[string]string)
-			failedLinksAndTitleByDomainMap[domain][url] = title
+			addValueToNestedStrStrMap(failedLinksAndTitleByDomainMap, url, url, title)
 		}
 	}()
 
-	finalTitlesAndLinks, err := compareArtefactsToHistoricData()
-
+	// TODO - awaiting consideration:
 	// Compare against historic file of links and titles
 	// - File for each? 
+	finalTitlesAndLinks, err := compareArtefactsToHistoricData()
 
-	//
 
 	// go routine to fork out and get the page from each link - fork by some -T threads ( threads requested % functions ) for equal links per thread
 
@@ -375,15 +402,37 @@ func main() {
 	// assessResult based on a config file on WHAT constitues
 	// marshall results from enumerated pages
 	
-	assignTokenBufferOffsets()
-	go func() {
+	// DO I need to actually worry its a read not a write?
+	// DO I actually need mutexs for maps for writes?
 
+	assignTokenBufferOffsets() // array -> tokenBufferthreadId
+	go func() {
 		page, err = curlNewArticle(url)
-		parsePage(page, tokenOffset)
-		assessParserResults()
-		marshallResults()
+		if err != nil {
+		checkError(err)
+		}
+		matchedTokens, goodPage, err := parsePage(page, tokenOffset)
+		if err != nil {
+			checkError(err)
+		}
+		err := marshallParserResults(goodPage, matchedTokens, url)
+		if err != nil {
+			checkError(err)
+		}
 	}()
 	// make sure everything converges in a go way
+
+	
+	// TODO double check this jibberish:
+
+	// IS J'SON actually the way and is csv just bad or is google data broking fucking with me we design decision dilemia doubling 
+	// ---- only need to store and compare urls
+	// if in the file remove from map
+	// Storage 2 files one .csv per run and collective with Page rating, time, url, matched tokens, And just previous-urls-found-only.list
+	// compare maps for domain against previous enumerated list file with gzlop
+	// Print Alert - similiar to each row of .csv of urls
+	backupDataStorage()
+	updateDataStorage()
 
 	// Output cli, file and (backup and then) organise historic data
 	err = selectOutput(outputArgs)
@@ -391,53 +440,30 @@ func main() {
 		checkError(err)
 	}
 
-	// TODO double check this jibberish:
-	// ---- only need to store and compare urls
-	// if in the file remove from map
-	// Storage 2 files one .csv per run and collective with Page rating, time, url, matched tokens, And just previous-urls-found-only.list
-	// compare maps for domain against previous enumerated list file with gzlop
-	// Print Alert - similiar to each row of .csv of urls
-
 
 }
 
-// Add to nestedStrStrMap is just a better styled answer from: https://stackoverflow.com/questions/64918219/how-to-assign-to-a-nested-map
-// Iterating over nested String maps - 1st is the [DOMAIN] so prints keys and values as key:value; 2nd prints just the values of [Domain][url]VALUE
-// for _, mapKey := range testmap { fmt.Println(url)	}
-// for _, key := range testmap["portswigger"] {fmt.Println(url)	}
-func addValueToNestedStrStrMap(parentMap map[string]map[string]string, parentKey, childKey string, nestedValue string) {
-    childMap := parentMap[parentKey]
-	if childMap == nil {
-		childMap = make(map[string]string)
-		parentMap[parentKey] = childMap
-	}
-	childMap[childKey] = nestedValue
+
+// REASONS keys for failed-map so that it makes sense
+
+// TODO site specifics
+//
+// findTokensOnPage() != findLinksAndTitlesFromBasePages
+//
+// gzlopGetHtmlTagAndLink()
+// search -> reborderise -> then back
+// search -> reborderise -> then forward
+
+
+func marshallParserResults(goodPage bool, matchedTokens string, url string) error {
+	if !goodPage {
+			// remove url from queue,
+			addValueToNestedStrStrMap(failedLinksAndTitleByDomainMap, "Parsed-Page-Results-Negative" , url, titles)
+		} else {
+			
+		}
+	return nil
 }
-
-
-// https://www.tutorialspoint.com/golang-program-to-convert-file-to-byte-array
-func loadTokensIntoMem(path string) (error, int ,[]bytes) {
-	tokensFile, err := os.Open(path)
-	if err != nil {
-		checkErr(err)
-	}
-	defer tokensFile.Close()
-
-	stat, err := tokensFile.Stat()
-	if err != nil {
-		checkErr(err)
-	}
-	
-	byteSlice := make([]byte, stat.Size())
-	_, err = bufio.NewReader(tokensFile).Read(byteSlice)
-	if err != nil && err != io.EOF {
-		checkError(err)
-		return err, 0, nil
-	}
-	bsSize = len(byteSlice)
-	return nil, bsSize, byteSlice
-}
-
 
 
 // -
