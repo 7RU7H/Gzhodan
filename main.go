@@ -327,36 +327,55 @@ func main() {
 	stat.totalUrlsVisited += totalUrls
 
 	// stdout -> 4 base pages
+	// create maps for each base pages
 	basePagesStdoutMap, err := curlNewBasePages(allBaseUrlsSeq)
 	if err != nil {
 		checkError(err)
 	}
 
-	getAllTitlesAndLinks(basePagesStdoutMap)
-	finalTitlesAndLinks := compareTitlesAndLinksToHistoricData()
+	// Get all links and titles from Base pages
+	artefactsFromBasePages, err := getAllTitlesAndLinks(basePagesStdoutMap)
+	if err != nil {
+		checkError(err)
+	}
 
-	go func() {
-		curlNewArticles()
-		assessPage()
-	}()
+	// Load tokens into memory
+	tokensBuffer, err := loadTokensIntoMem(tokensFilePath)
 
-	//
-	// URL:TITLE linked go routined control flow FOR EACH URL parentFunc -> urlNamed (I want it to scale and not have to hardcode each) -> flow from A -> Z
-	// - Scalable,
-
-	// create maps for each base pages
-
-	// go routine a for loop that value of the basePagesStdoutMap is passed instead
-
-	// Get all links and titles
-	//
-	// Get new Pages
-	err = curlNewArticles(finalUrlsArr)
+	finalTitlesAndLinks, err := compareArtefactsToHistoricData()
 
 	// Compare against historic file of links and titles
 	// - File for each
 
-	// Curl pages to memory and search for tokens
+	//
+
+	// go routine to fork out and get the page from each link - fork by some -T threads ( threads requested % functions ) for equal links per thread
+
+	// Manage being able reading tokens in memory based on circular buffer 	   ([ x -> y -> z -] )
+	// So if there are three threads x,y,z they read from an offsest circularly [<- zstradle--|]
+	go func() {
+		titleCheckResult, err = parseTitles(tokenOffset)
+		if !titleCheckResult {
+			// Dump url and titles from application memory
+			//
+		}
+	}()
+	// make sure everything converges in a go way
+
+	// Manage being able reading tokens in memory based on circular buffer 	   ([ x -> y -> z -] )
+	// So if there are three threads x,y,z they read from an offsest circularly [<- zstradle--|]
+	// Curl pages to memory
+	// search for token found limit (bear in mind the amount of tokens is not large so worry about closure is not a problem)
+	// assessResult based on a config file on WHAT constitues
+	// marshall results from enumerated pages
+	go func() {
+
+		page, err = curlNewArticle(url)
+		parsePage(page, tokenOffset)
+		assessParserResults()
+		marshallResults()
+	}()
+	// make sure everything converges in a go way
 
 	// Output cli, file and (backup and then) organise historic data
 	err = selectOutput(outputArgs)
@@ -364,19 +383,46 @@ func main() {
 		checkError(err)
 	}
 
+	// TODO double check this jibberish:
 	// ---- only need to store and compare urls
 	// if in the file remove from map
 	// Storage 2 files one .csv per run and collective with Page rating, time, url, matched tokens, And just previous-urls-found-only.list
 	// compare maps for domain against previous enumerated list file with gzlop
-
 	// Print Alert - similiar to each row of .csv of urls
 
-	// Where the funky code really begins
-	entries, err := os.ReadDir(saveDirectory)
-	checkError(err)
 
 }
 
+// https://www.tutorialspoint.com/golang-program-to-convert-file-to-byte-array
+func loadTokensIntoMem(path string) (error, int ,[]bytes) {
+	tokensFile, err := os.Open(path)
+	if err != nil {
+		checkErr(err)
+	}
+	defer tokensFile.Close()
+
+	stat, err := tokensFile.Stat()
+	if err != nil {
+		checkErr(err)
+	}
+	
+	byteSlice := make([]byte, stat.Size())
+	_, err = bufio.NewReader(tokensFile).Read(byteSlice)
+	if err != nil && err != io.EOF {
+		checkError(err)
+		return err, 0, nil
+	}
+	bsSize = len(byteSlice)
+	return nil, bsSize, byteSlice
+}
+
+
+
+// -
+// -
+// Low Sleep Idiocy, but Past me is still got the right ideas - just needs refactoring to main function specification scaffolding
+// - 
+// -
 func getAllTitlesAndLinks(basePagesStdoutMap map[string]string) (map[string]map[int]string, error) {
 
 	arstechnicaTokensMap, portswiggerTokensMap, thehackernewsTokensMap, sansTokensMap := make(map[int]string), make(map[int]string), make(map[int]string), make(map[int]string)
@@ -449,8 +495,13 @@ func compareTitlesAndLinksToHistoricData(historicUrlsFile, tokensFile string, ur
 	// BRAIN NEED THUNK HERE
 	//
 	return nil
-}
 
+
+// -
+// -
+// OUTPUT TODO
+// -
+// -
 func selectOutput(args []string) error {
 	argsSize := len(strings.Join(args, ""))
 	var argsId int
