@@ -341,6 +341,18 @@ func main() {
 
 	// Load tokens into memory
 	tokensBuffer, err := loadTokensIntoMem(tokensFilePath)
+	
+	failedLinksAndTitleByDomainMap := make(map[string]map[string]string)
+
+	assignTokenBufferOffsets()
+	go func() {
+		titleCheckResult, err = parseTitles(tokenOffset)
+		if !titleCheckResult {
+			// Dump url and titles from application memory
+			failedLinksAndTitleByDomainMap[domain] = make(map[string]string)
+			failedLinksAndTitleByDomainMap[domain][url] = title
+		}
+	}()
 
 	finalTitlesAndLinks, err := compareArtefactsToHistoricData()
 
@@ -353,13 +365,7 @@ func main() {
 
 	// Manage being able reading tokens in memory based on circular buffer 	   ([ x -> y -> z -] )
 	// So if there are three threads x,y,z they read from an offsest circularly [<- zstradle--|]
-	go func() {
-		titleCheckResult, err = parseTitles(tokenOffset)
-		if !titleCheckResult {
-			// Dump url and titles from application memory
-			//
-		}
-	}()
+	
 	// make sure everything converges in a go way
 
 	// Manage being able reading tokens in memory based on circular buffer 	   ([ x -> y -> z -] )
@@ -368,6 +374,8 @@ func main() {
 	// search for token found limit (bear in mind the amount of tokens is not large so worry about closure is not a problem)
 	// assessResult based on a config file on WHAT constitues
 	// marshall results from enumerated pages
+	
+	assignTokenBufferOffsets()
 	go func() {
 
 		page, err = curlNewArticle(url)
@@ -392,6 +400,20 @@ func main() {
 
 
 }
+
+// Add to nestedStrStrMap is just a better styled answer from: https://stackoverflow.com/questions/64918219/how-to-assign-to-a-nested-map
+// Iterating over nested String maps - 1st is the [DOMAIN] so prints keys and values as key:value; 2nd prints just the values of [Domain][url]VALUE
+// for _, mapKey := range testmap { fmt.Println(url)	}
+// for _, key := range testmap["portswigger"] {fmt.Println(url)	}
+func addValueToNestedStrStrMap(parentMap map[string]map[string]string, parentKey, childKey string, nestedValue string) {
+    childMap := parentMap[parentKey]
+	if childMap == nil {
+		childMap = make(map[string]string)
+		parentMap[parentKey] = childMap
+	}
+	childMap[childKey] = nestedValue
+}
+
 
 // https://www.tutorialspoint.com/golang-program-to-convert-file-to-byte-array
 func loadTokensIntoMem(path string) (error, int ,[]bytes) {
