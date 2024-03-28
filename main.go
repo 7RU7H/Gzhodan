@@ -293,7 +293,7 @@ func addValueToNestedStrStrMap(parentMap map[string]map[string]string, parentKey
 }
 
 // https://www.tutorialspoint.com/golang-program-to-convert-file-to-byte-array
-func (a *Application) loadTokensIntoMem() (error, int, []byte) {
+func (a *Application) loadTokensIntoMem() ([]byte, int, error) {
 	tokensFile, err := os.Open(a.tokensFile)
 	if err != nil {
 		checkError(err)
@@ -309,10 +309,10 @@ func (a *Application) loadTokensIntoMem() (error, int, []byte) {
 	_, err = bufio.NewReader(tokensFile).Read(byteSlice)
 	if err != nil && err != io.EOF {
 		checkError(err)
-		return err, 0, nil
+		return nil, 0, err
 	}
 	bsSize := len(byteSlice)
-	return nil, bsSize, byteSlice
+	return byteSlice, bsSize, nil
 }
 
 func (a *Application) handleArgs(args []string, argsLength int) error {
@@ -476,7 +476,7 @@ func main() {
 	//
 
 	// Load tokens into memory
-	tokensBuffer, err := loadTokensIntoMem(tokensFilePath)
+	tokensBuffer, tokenBufferSize, err := app.loadTokensIntoMem()
 
 	failedLinksAndTitleByDomainMap := make(map[string]map[string]string)
 
@@ -637,7 +637,8 @@ func compareTitlesAndLinksToHistoricData(historicUrlsFile, tokensFile string, ur
 	for _, token := range searchTokens {
 		artifacts, err := gzlopBuffer(file, token)
 		checkError(err)
-		allTheArtefacts[token] = artifacts
+		// WTF
+		allTheArtefacts[] = artifacts
 	}
 	//
 	// BRAIN NEED THUNK HERE
