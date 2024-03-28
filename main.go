@@ -3,8 +3,9 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"errors"
+	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/url"
 	"os"
@@ -16,24 +17,33 @@ import (
 	"time"
 )
 
+type Application struct {
+	appDir          string
+	tmpDir          string
+	testDir         string
+	previousRuntime string
+	statistics      Statistics
+	noGzhodanConfig bool
+	multiDaily      bool
+	gzhodanConfig   string
+	optionalConfigs map[string]string
+	tokensFile      string
+}
+
 type Statistics struct {
-	os               string
-	appDir           string
-	tmpDir           string
-	testDir          string
+	operatingSystem  string
 	originalDomains  int
 	originalUrls     int
 	totalUrlsVisited int
 	date             string
 	year             string
+	appStartTime     time.Time
 }
 
 var (
 	WarningLogger *log.Logger
 	InfoLogger    *log.Logger
 	ErrorLogger   *log.Logger
-	// Bad Globals till I decide on flags, or modules
-	TokenFilePathGlobal string
 )
 
 // Restructure
@@ -155,18 +165,23 @@ func mkDirAndCD(date string) error {
 	return nil
 }
 
-func checkPrevRuntimes(appDir, date string) error {
-	dirListing, err := os.ReadDir(appDir)
+// -
+// TODO
+// -
+func (a *Application) checkPrevRuntimes() error {
+	dirListing, err := os.ReadDir(a.appDir)
 	if err != nil {
-		return err
+		checkError(err)
 	}
 
 	for _, dir := range dirListing {
-		if dir.Name() == date {
-			log.Fatal(errors.New("Directory already exists"))
-			return errors.New("Directory already exists")
+		if dir.Name() == a.statistics.date {
+			err := fmt.Errorf("directory already exists %s", dir.Name())
+			checkError(err)
 		}
 	}
+
+	a.previousRuntime = ""
 
 	return nil
 }
@@ -243,14 +258,13 @@ func gzlopBuffer(buffer *bytes.Buffer, patterns []byte) (map[int]string, error) 
 	return artifacts, nil
 }
 
-func getTokensFileContentsAsBytes() ([]byte, error) {
+func getTokensFileContentsAsBytes(tokensFile string) ([]byte, error) {
 	var tokenFileAsBytes []byte
-	exists, err := checkFileExists(TokenFilePathGlobal)
-	checkError(err)
-	if !exists {
-		// tokens file path does not exist
+	exists, err := checkFileExists(tokensFile)
+	if err != nil || !exists {
+		checkError(err)
 	} else {
-		file, err := os.Open("file.txt")
+		file, err := os.Open(tokensFile)
 		checkError(err)
 		defer file.Close()
 		scanner := bufio.NewScanner(file)
@@ -270,7 +284,7 @@ func getTokensFileContentsAsBytes() ([]byte, error) {
 // for _, mapKey := range testmap { fmt.Println(url)	}
 // for _, key := range testmap["portswigger"] {fmt.Println(url)	}
 func addValueToNestedStrStrMap(parentMap map[string]map[string]string, parentKey, childKey string, nestedValue string) {
-    childMap := parentMap[parentKey]
+	childMap := parentMap[parentKey]
 	if childMap == nil {
 		childMap = make(map[string]string)
 		parentMap[parentKey] = childMap
@@ -278,64 +292,149 @@ func addValueToNestedStrStrMap(parentMap map[string]map[string]string, parentKey
 	childMap[childKey] = nestedValue
 }
 
-
 // https://www.tutorialspoint.com/golang-program-to-convert-file-to-byte-array
-func loadTokensIntoMem(path string) (error, int ,[]bytes) {
-	tokensFile, err := os.Open(path)
+func (a *Application) loadTokensIntoMem() (error, int, []byte) {
+	tokensFile, err := os.Open(a.tokensFile)
 	if err != nil {
-		checkErr(err)
+		checkError(err)
 	}
 	defer tokensFile.Close()
 
 	stat, err := tokensFile.Stat()
 	if err != nil {
-		checkErr(err)
+		checkError(err)
 	}
-	
+
 	byteSlice := make([]byte, stat.Size())
 	_, err = bufio.NewReader(tokensFile).Read(byteSlice)
 	if err != nil && err != io.EOF {
 		checkError(err)
 		return err, 0, nil
 	}
-	bsSize = len(byteSlice)
+	bsSize := len(byteSlice)
 	return nil, bsSize, byteSlice
 }
 
+func (a *Application) handleArgs(args []string, argsLength int) error {
+	for i := 0; i <= argsLength-1; i++ {
+		switch args[i] {
+		case "-o":
+			// Check Directory exist function required
+			a.appDir = args[i+1]
+		case "-m":
+			a.multiDaily = true
+		case "-O":
+			configListSlice := strings.SplitAfterN(args[i+1], ",", -1)
+			tmpmap := make(map[string]string)
+			for _, config := range configListSlice {
+				var key string
+				if strings.Contains(config, "/") {
+					keySlice := strings.SplitAfterN(config, "/", -1)
+					key = keySlice[len(keySlice)-1]
+				}
+				if strings.Contains(config, "\\") {
+					keySlice := strings.SplitAfterN(config, "\\", -1)
+					key = keySlice[len(keySlice)-1]
+				}
+				keySlice := strings.Split(key, ".")
+				key = keySlice[0]
+				exists, err := checkFileExists(config)
+				if err != nil || !exists {
+					checkError(err)
+				}
+				tmpmap[key] = config
+			}
+		case "-t":
+			exists, err := checkFileExists(args[i+1])
+			if err != nil || !exists {
+				checkError(err)
+			}
+			a.tokensFile = args[i+1]
+		case "-G":
+			exists, err := checkFileExists(args[i+1])
+			if err != nil || !exists {
+				checkError(err)
+			}
+			a.gzhodanConfig = args[i+1]
+		case "-g":
+			a.noGzhodanConfig = true
+		default:
+			err := fmt.Errorf("invalid arguments provided: %v", args)
+			checkError(err)
+		}
+	}
+
+	return nil
+}
 
 func main() {
-	appDir, err := os.Getwd()
-	if err != nil {
+	var dataDirectory, gzhodanConfig, multiDaily, noGzhodanConfig, optionalConfigs, tokensFile string
+	flag.StringVar(&noGzhodanConfig, "g", "", "Use internally hardcoded configurations")
+	flag.StringVar(&gzhodanConfig, "G", "gzhodan.conf", "Provide a Gzhodan configuration file!")
+	flag.StringVar(&optionalConfigs, "O", "", "Optional configuration files seperated with a comma")
+	flag.StringVar(&dataDirectory, "o", "", "Directory for which previous and new data is read and written to")
+	flag.StringVar(&multiDaily, "m", "", "If application is running multiple times per day this is REQUIRED flag!")
+	flag.StringVar(&tokensFile, "t", "", "If Gzhodan requires custom tokens -- not compatible with -g or -G !!!")
+	flag.Parse()
+
+	args, argsLen := os.Args, len(os.Args)
+	if argsLen > 2 {
+		flag.PrintDefaults()
+		err := fmt.Errorf("lack of arguments provided")
 		checkError(err)
+		os.Exit(1)
 	}
-	stat := Statistics{}
-	stat.os = runtime.GOOS
-	stat.tmpDir = os.TempDir()
-	stat.appDir = appDir
+
+	appStartTime := time.Now().UTC()
+
+	dateFormatted := appStartTime.Format("2006-01-01")
+	nameBuilder := strings.Builder{}
+	nameBuilder.WriteString(dateFormatted)
+	nameBuilder.WriteString(".log")
+
+	InfoLogger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	WarningLogger = log.New(os.Stdout, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
+	ErrorLogger = log.New(os.Stdout, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+
+	app := Application{}
+	app.multiDaily = false
+	app.noGzhodanConfig = false
+	app.statistics = Statistics{}
+	app.statistics.appStartTime = appStartTime
+	app.tmpDir = os.TempDir()
+	app.statistics.operatingSystem = runtime.GOOS
 	now := time.Now().UTC()
-	stat.date = now.Format("2006-01-01")
-	stat.year = strconv.Itoa(now.Year())
-	err = checkPrevRuntimes(stat.appDir, stat.date)
+	app.statistics.date = now.Format("2006-01-01")
+	app.statistics.year = strconv.Itoa(now.Year())
+
+	err := app.handleArgs(args, argsLen)
 	if err != nil {
 		checkError(err)
 	}
-	dirTree := []string{"test", "logs", "newletters", stat.year}
-	err = mkAppDirTree(stat.appDir, dirTree)
+
+	err = app.checkPrevRuntimes()
 	if err != nil {
 		checkError(err)
 	}
-	stat.testDir = filepath.Join(appDir, "test")
+
+	dirTree := []string{"test", "logs", "newletters", app.statistics.year}
+	err = mkAppDirTree(app.appDir, dirTree)
+	if err != nil {
+		checkError(err)
+	}
+	app.testDir = filepath.Join(app.appDir, "test")
+
 	err = initaliseLogging()
 	if err != nil {
 		checkError(err)
 	}
 	InfoLogger.Printf("Logging initialised")
 
-	err = mkDirAndCD(stat.date)
+	err = mkDirAndCD(app.statistics.date)
 	if err != nil {
 		checkError(err)
 	}
-	saveDirectory := stat.date
+	//saveDirectory := app.statistics.date
 
 	urlsToVisit, baseDNSurlTotals, err := marshalURLsToMap()
 	if err != nil {
@@ -347,14 +446,14 @@ func main() {
 	}
 
 	totalUrls := 0
-	stat.originalDomains = len(baseDNSurlTotals) - 1
+	app.statistics.originalDomains = len(baseDNSurlTotals) - 1
 
 	for _, val := range baseDNSurlTotals {
 		totalUrls = +val
 	}
 
-	stat.originalUrls = totalUrls
-	stat.totalUrlsVisited += totalUrls
+	app.statistics.originalUrls = totalUrls
+	app.statistics.totalUrlsVisited += totalUrls
 
 	// stdout -> 4 base pages
 	// create maps for each base pages
@@ -369,9 +468,16 @@ func main() {
 		checkError(err)
 	}
 
+	//
+	//  AAAAAAARGH!! Do I want to check all the titles, yes
+	// Do in this order:
+	// compare to historic data -------  yes because I do not want to store the same url over and over again - gzlop-age!
+	// parse titles if it not in historic data -------- yes because why visit a url if the title is not worth checking
+	//
+
 	// Load tokens into memory
 	tokensBuffer, err := loadTokensIntoMem(tokensFilePath)
-	
+
 	failedLinksAndTitleByDomainMap := make(map[string]map[string]string)
 
 	assignTokenBufferOffsets()
@@ -384,15 +490,14 @@ func main() {
 
 	// TODO - awaiting consideration:
 	// Compare against historic file of links and titles
-	// - File for each? 
+	// - File for each?
 	finalTitlesAndLinks, err := compareArtefactsToHistoricData()
-
 
 	// go routine to fork out and get the page from each link - fork by some -T threads ( threads requested % functions ) for equal links per thread
 
 	// Manage being able reading tokens in memory based on circular buffer 	   ([ x -> y -> z -] )
 	// So if there are three threads x,y,z they read from an offsest circularly [<- zstradle--|]
-	
+
 	// make sure everything converges in a go way
 
 	// Manage being able reading tokens in memory based on circular buffer 	   ([ x -> y -> z -] )
@@ -401,7 +506,7 @@ func main() {
 	// search for token found limit (bear in mind the amount of tokens is not large so worry about closure is not a problem)
 	// assessResult based on a config file on WHAT constitues
 	// marshall results from enumerated pages
-	
+
 	// DO I need to actually worry its a read not a write?
 	// DO I actually need mutexs for maps for writes?
 
@@ -409,7 +514,7 @@ func main() {
 	go func() {
 		page, err = curlNewArticle(url)
 		if err != nil {
-		checkError(err)
+			checkError(err)
 		}
 		matchedTokens, goodPage, err := parsePage(page, tokenOffset)
 		if err != nil {
@@ -422,10 +527,9 @@ func main() {
 	}()
 	// make sure everything converges in a go way
 
-	
 	// TODO double check this jibberish:
 
-	// IS J'SON actually the way and is csv just bad or is google data broking fucking with me we design decision dilemia doubling 
+	// IS J'SON actually the way and is csv just bad or is google data broking fucking with me we design decision dilemia doubling
 	// ---- only need to store and compare urls
 	// if in the file remove from map
 	// Storage 2 files one .csv per run and collective with Page rating, time, url, matched tokens, And just previous-urls-found-only.list
@@ -440,9 +544,7 @@ func main() {
 		checkError(err)
 	}
 
-
 }
-
 
 // REASONS keys for failed-map so that it makes sense
 
@@ -454,22 +556,20 @@ func main() {
 // search -> reborderise -> then back
 // search -> reborderise -> then forward
 
-
 func marshallParserResults(goodPage bool, matchedTokens string, url string) error {
 	if !goodPage {
-			// remove url from queue,
-			addValueToNestedStrStrMap(failedLinksAndTitleByDomainMap, "Parsed-Page-Results-Negative" , url, titles)
-		} else {
-			
-		}
+		// remove url from queue,
+		addValueToNestedStrStrMap(failedLinksAndTitleByDomainMap, "Parsed-Page-Results-Negative", url, titles)
+	} else {
+
+	}
 	return nil
 }
-
 
 // -
 // -
 // Low Sleep Idiocy, but Past me is still got the right ideas - just needs refactoring to main function specification scaffolding
-// - 
+// -
 // -
 func getAllTitlesAndLinks(basePagesStdoutMap map[string]string) (map[string]map[int]string, error) {
 
@@ -544,6 +644,7 @@ func compareTitlesAndLinksToHistoricData(historicUrlsFile, tokensFile string, ur
 	//
 	return nil
 
+}
 
 // -
 // -
@@ -615,7 +716,7 @@ func verboseMarkdownOutput() {
 
 }
 
-// defaultOutput - cli some statistics and markdown report
+// defaultOutput - cli some app.statistics.stics and markdown report
 
 func defaultOutput() {
 
