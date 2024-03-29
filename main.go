@@ -35,7 +35,7 @@ type Statistics struct {
 	originalDomains  int
 	originalUrls     int
 	totalUrlsVisited int
-	date             string
+	date             time.Time
 	year             string
 	appStartTime     time.Time
 }
@@ -46,7 +46,7 @@ var (
 	ErrorLogger   *log.Logger
 )
 
-// Restructure
+// Restructure err, 0, 0
 func checkError(err error) error {
 	if err != nil {
 		fmt.Errorf("%s", err)
@@ -56,6 +56,9 @@ func checkError(err error) error {
 	return err
 }
 
+// -
+// Todo
+// -
 func keyToDomainString(keyUrl string) (string, error) {
 	parsedURL, err := url.Parse(keyUrl)
 	if err != nil {
@@ -165,24 +168,48 @@ func mkDirAndCD(date string) error {
 	return nil
 }
 
-// -
-// TODO
-// -
 func (a *Application) checkPrevRuntimes() error {
 	dirListing, err := os.ReadDir(a.appDir)
 	if err != nil {
 		checkError(err)
+		return err
 	}
 
+	if len(dirListing) < 1 {
+		InfoLogger.Printf("No previous data found\n")
+		a.previousRuntime = ""
+		return nil
+	}
+
+	currDateStr := time.Time.String(a.statistics.date)
+	compare, err := time.Parse(time.DateOnly, "2006-03-03")
 	for _, dir := range dirListing {
-		if dir.Name() == a.statistics.date {
-			err := fmt.Errorf("directory already exists %s", dir.Name())
+		tmp, err := time.Parse(time.DateOnly, dir.Name())
+		if err != nil {
 			checkError(err)
+			continue
+		}
+		if dir.Name() == currDateStr {
+			if !a.multiDaily {
+				err := fmt.Errorf("directory already exists %s", dir.Name())
+				checkError(err)
+				continue
+			} else {
+				a.previousRuntime = currDateStr
+				return nil
+			}
+		}
+		if tmp.After(compare) {
+			compare = tmp
+		}
+
+		if compare.After(a.statistics.date) {
+			err := fmt.Errorf("current date %v, is before a directory already made of date: %v", a.statistics.date, compare)
+			checkError(err)
+			return err
 		}
 	}
-
-	a.previousRuntime = ""
-
+	a.previousRuntime = time.Time.String(compare)
 	return nil
 }
 
@@ -404,7 +431,7 @@ func main() {
 	app.tmpDir = os.TempDir()
 	app.statistics.operatingSystem = runtime.GOOS
 	now := time.Now().UTC()
-	app.statistics.date = now.Format("2006-01-01")
+	app.statistics.date = time.Parse(time.DateOnly)
 	app.statistics.year = strconv.Itoa(now.Year())
 
 	err := app.handleArgs(args, argsLen)
@@ -417,24 +444,23 @@ func main() {
 		checkError(err)
 	}
 
-	dirTree := []string{"test", "logs", "newletters", app.statistics.year}
-	err = mkAppDirTree(app.appDir, dirTree)
-	if err != nil {
-		checkError(err)
-	}
-	app.testDir = filepath.Join(app.appDir, "test")
-
 	err = initaliseLogging()
 	if err != nil {
 		checkError(err)
 	}
 	InfoLogger.Printf("Logging initialised")
 
-	err = mkDirAndCD(app.statistics.date)
+	err = mkDirAndCD(app.appDir)
 	if err != nil {
 		checkError(err)
 	}
-	//saveDirectory := app.statistics.date
+
+	dirTree := []string{"test", "logs", "newletters", app.statistics.year}
+	err = mkAppDirTree(app.appDir, dirTree)
+	if err != nil {
+		checkError(err)
+	}
+	app.testDir = filepath.Join(app.appDir, "test")
 
 	urlsToVisit, baseDNSurlTotals, err := marshalURLsToMap()
 	if err != nil {
@@ -638,7 +664,7 @@ func compareTitlesAndLinksToHistoricData(historicUrlsFile, tokensFile string, ur
 		artifacts, err := gzlopBuffer(file, token)
 		checkError(err)
 		// WTF
-		allTheArtefacts[] = artifacts
+		// allTheArtefacts[] = artifacts
 	}
 	//
 	// BRAIN NEED THUNK HERE
