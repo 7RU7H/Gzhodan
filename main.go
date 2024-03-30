@@ -47,6 +47,60 @@ var (
 	ErrorLogger   *log.Logger
 )
 
+func (a *Application) selectOutput() error {
+	argsSize := len(a.outputType)
+	var argsId int = 0
+	if argsSize != 1 {
+		switch arg {
+			case "C-V":
+				argsId = 3
+			case "V-C":
+				argsId = 3
+			case "M-V":
+				argsId = 7
+			case "V-M":
+				argsId = 7
+			default:
+				argsId = 0
+				err := fmt.Errorf("invalid output arguments provide: %v ; from slice of size: %v with the contents: %v", arg, argsSize, args)
+				checkError(err)
+				return err
+			}
+	} else {
+		switch a.outputType {
+			case "V":
+				argsId = 1
+			case "C":
+				argsId = 2
+			case "M":
+				argsId = 5
+			default:
+				err := fmt.Errorf("invalid output arguments provide: %v ; from slice of size: %v with the contents: %v", arg, argsSize, args)
+				checkError(err)
+				return err
+			}	
+		}
+	
+	switch argsId {
+	case 1: // verbose
+		verboseOutput()
+	case 2: // cli only
+		cliOnlyOutput()
+	case 3: // verbose cli only
+		verboseCliOutput()
+	case 5: // markdown only
+		m*arkdownOnlyOutput()
+	case 6: // verbose markdown
+		verboseMarkdownOutput()
+	case 0:
+		defaultOutput()
+	default:
+		err := fmt.Errorf("invalid arg idenfier counted %v", argsId)
+		checkError(err)
+		return err
+	}
+	return nil
+}
 // Restructure err, 0, 0
 func checkError(err error) error {
 	if err != nil {
@@ -570,7 +624,11 @@ func main() {
 	// Storage 2 files one .csv per run and collective with Page rating, time, url, matched tokens, And just previous-urls-found-only.list
 	// compare maps for domain against previous enumerated list file with gzlop
 	// Print Alert - similiar to each row of .csv of urls
+ 
+	// Another kick in the really would like gzhobin data files
 	backupDataStorage()
+
+	// Another kick the really would like gzhobin data files 
 	updateDataStorage()
 
 	// Output cli, file and (backup and then) organise historic data
@@ -580,6 +638,7 @@ func main() {
 	}
 
 }
+
 
 // REASONS keys for failed-map so that it makes sense
 
@@ -682,61 +741,6 @@ func compareTitlesAndLinksToHistoricData(historicUrlsFile, tokensFile string, ur
 // OUTPUT TODO
 // -
 // -
-func (a *Application) selectOutput() error {
-	argsSize := len(a.outputType)
-	var argsId int = 0
-	if argsSize != 1 {
-		switch arg {
-			case "C-V":
-				argsId = 3
-			case "V-C":
-				argsId = 3
-			case "M-V":
-				argsId = 7
-			case "V-M":
-				argsId = 7
-			default:
-				argsId = 0
-				err := fmt.Errorf("invalid output arguments provide: %v ; from slice of size: %v with the contents: %v", arg, argsSize, args)
-				checkError(err)
-				return err
-			}
-	} else {
-		switch a.outputType {
-			case "V":
-				argsId = 1
-			case "C":
-				argsId = 2
-			case "M":
-				argsId = 5
-			default:
-				err := fmt.Errorf("invalid output arguments provide: %v ; from slice of size: %v with the contents: %v", arg, argsSize, args)
-				checkError(err)
-				return err
-			}	
-		}
-	
-	switch argsId {
-	case 1: // verbose
-		verboseOutput()
-	case 2: // cli only
-		cliOnlyOutput()
-	case 3: // verbose cli only
-		verboseCliOutput()
-	case 5: // markdown only
-		m*arkdownOnlyOutput()
-	case 6: // verbose markdown
-		verboseMarkdownOutput()
-	case 0:
-		defaultOutput()
-	default:
-		err := fmt.Errorf("invalid arg idenfier counted %v", argsId)
-		checkError(err)
-		return err
-	}
-	return nil
-
-}
 
 // verboseOutput - markdown + verbose markdown report, cli is verbose
 func verboseOutput() {
