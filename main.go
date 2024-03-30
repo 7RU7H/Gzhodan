@@ -25,6 +25,7 @@ type Application struct {
 	statistics      Statistics
 	noGzhodanConfig bool
 	multiDaily      bool
+	outputType      string
 	gzhodanConfig   string
 	optionalConfigs map[string]string
 	tokensFile      string
@@ -56,27 +57,13 @@ func checkError(err error) error {
 	return err
 }
 
-// -
-// Todo
-// -
-func keyToDomainString(keyUrl string) (string, error) {
+func urlKeyToDomainString(keyUrl string) (string, error) {
 	parsedURL, err := url.Parse(keyUrl)
 	if err != nil {
 		fmt.Errorf("invalid url: %s\n", keyUrl)
 		checkError(err)
 	}
-
-	hostname := parsedURL.Hostname()
-
-	switch hostname {
-	case "arstechnica.com":
-	case "portswigger.net":
-	case "thehackernews.com":
-	case "www.sans.org":
-	default:
-
-	}
-	return hostname, nil
+	return parsedURL.Hostname(), nil
 }
 
 func createFile(filepath string) error {
@@ -385,6 +372,24 @@ func (a *Application) handleArgs(args []string, argsLength int) error {
 			a.gzhodanConfig = args[i+1]
 		case "-g":
 			a.noGzhodanConfig = true
+		case "-C":
+			if a.outputType != "" {
+				a.outputType = a.outputType + "-C"
+			} else {
+				a.outputType = "C"
+			}
+		case "-M":
+			if a.outputType != "" {
+				a.outputType = a.outputType + "-M"
+			} else {
+				a.outputType = "M"
+			}
+		case "-V":
+			if a.outputType != "" {
+				a.outputType = a.outputType + "-V"
+			} else {
+				a.outputType = "V"
+			}
 		default:
 			err := fmt.Errorf("invalid arguments provided: %v", args)
 			checkError(err)
@@ -395,13 +400,16 @@ func (a *Application) handleArgs(args []string, argsLength int) error {
 }
 
 func main() {
-	var dataDirectory, gzhodanConfig, multiDaily, noGzhodanConfig, optionalConfigs, tokensFile string
+	var dataDirectory, gzhodanConfig, multiDaily, noGzhodanConfig, optionalConfigs, tokensFile, markdownOnly, cliOnly, verboseOutput string
 	flag.StringVar(&noGzhodanConfig, "g", "", "Use internally hardcoded configurations")
 	flag.StringVar(&gzhodanConfig, "G", "gzhodan.conf", "Provide a Gzhodan configuration file!")
 	flag.StringVar(&optionalConfigs, "O", "", "Optional configuration files seperated with a comma")
 	flag.StringVar(&dataDirectory, "o", "", "Directory for which previous and new data is read and written to")
 	flag.StringVar(&multiDaily, "m", "", "If application is running multiple times per day this is REQUIRED flag!")
 	flag.StringVar(&tokensFile, "t", "", "If Gzhodan requires custom tokens -- not compatible with -g or -G !!!")
+	flag.StringVar(&markdownOnly, "M", "", "Verbose output is combinable with -V for verbose")
+	flag.StringVar(&cliOnly, "C", "", "CLI only output is combinable with -V for verbose")
+	flag.StringVar(&verboseOutput, "V", "", "Verbose output is combinable with -C or -M")
 	flag.Parse()
 
 	args, argsLen := os.Args, len(os.Args)
@@ -417,6 +425,7 @@ func main() {
 	dateFormatted := appStartTime.Format("2006-01-01")
 	nameBuilder := strings.Builder{}
 	nameBuilder.WriteString(dateFormatted)
+
 	nameBuilder.WriteString(".log")
 
 	InfoLogger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
@@ -431,7 +440,7 @@ func main() {
 	app.tmpDir = os.TempDir()
 	app.statistics.operatingSystem = runtime.GOOS
 	now := time.Now().UTC()
-	app.statistics.date = time.Parse(time.DateOnly)
+	app.statistics.date = //
 	app.statistics.year = strconv.Itoa(now.Year())
 
 	err := app.handleArgs(args, argsLen)
@@ -598,20 +607,15 @@ func marshallParserResults(goodPage bool, matchedTokens string, url string) erro
 // -
 // -
 func getAllTitlesAndLinks(basePagesStdoutMap map[string]string) (map[string]map[int]string, error) {
-
 	arstechnicaTokensMap, portswiggerTokensMap, thehackernewsTokensMap, sansTokensMap := make(map[int]string), make(map[int]string), make(map[int]string), make(map[int]string)
 	for key, value := range basePagesStdoutMap {
-		domain, err := keyToDomainString(key)
+		domain, err := urlKeyToDomainString(key)
 		checkError(err)
 
 		webPageBuffer := bytes.NewBuffer([]byte(value))
 		tokens, err := getTokensFileContentsAsBytes(TokenFilePathGlobal)
 		checkError(err)
 		switch domain {
-		// sans
-		// arstechnica
-		// thehackernews
-		//
 		case "arstechnica.com":
 			arstechnicaTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
 			checkError(err)
@@ -678,28 +682,40 @@ func compareTitlesAndLinksToHistoricData(historicUrlsFile, tokensFile string, ur
 // OUTPUT TODO
 // -
 // -
-func selectOutput(args []string) error {
-	argsSize := len(strings.Join(args, ""))
-	var argsId int
-	if argsSize != 0 {
-		for _, arg := range args {
-			switch arg {
-			case "verbose":
-				argsId += 1
-			case "cli":
-				argsId += 2
-			case "markdown":
-				argsId += 5
-
+func (a *Application) selectOutput() error {
+	argsSize := len(a.outputType)
+	var argsId int = 0
+	if argsSize != 1 {
+		switch arg {
+			case "C-V":
+				argsId = 3
+			case "V-C":
+				argsId = 3
+			case "M-V":
+				argsId = 7
+			case "V-M":
+				argsId = 7
 			default:
+				argsId = 0
 				err := fmt.Errorf("invalid output arguments provide: %v ; from slice of size: %v with the contents: %v", arg, argsSize, args)
 				checkError(err)
 				return err
 			}
-		}
 	} else {
-		argsId = argsSize
-	}
+		switch a.outputType {
+			case "V":
+				argsId = 1
+			case "C":
+				argsId = 2
+			case "M":
+				argsId = 5
+			default:
+				err := fmt.Errorf("invalid output arguments provide: %v ; from slice of size: %v with the contents: %v", arg, argsSize, args)
+				checkError(err)
+				return err
+			}	
+		}
+	
 	switch argsId {
 	case 1: // verbose
 		verboseOutput()
@@ -708,7 +724,7 @@ func selectOutput(args []string) error {
 	case 3: // verbose cli only
 		verboseCliOutput()
 	case 5: // markdown only
-		markdownOnlyOutput()
+		m*arkdownOnlyOutput()
 	case 6: // verbose markdown
 		verboseMarkdownOutput()
 	case 0:
