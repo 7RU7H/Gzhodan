@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -51,36 +52,36 @@ func (a *Application) selectOutput() error {
 	argsSize := len(a.outputType)
 	var argsId int = 0
 	if argsSize != 1 {
-		switch arg {
-			case "C-V":
-				argsId = 3
-			case "V-C":
-				argsId = 3
-			case "M-V":
-				argsId = 7
-			case "V-M":
-				argsId = 7
-			default:
-				argsId = 0
-				err := fmt.Errorf("invalid output arguments provide: %v ; from slice of size: %v with the contents: %v", arg, argsSize, args)
-				checkError(err)
-				return err
-			}
+		switch a.outputType {
+		case "C-V":
+			argsId = 3
+		case "V-C":
+			argsId = 3
+		case "M-V":
+			argsId = 7
+		case "V-M":
+			argsId = 7
+		default:
+			argsId = 0
+			err := fmt.Errorf("invalid output arguments provide: %v ; from slice of size: %v", a.outputType, argsSize)
+			checkError(err)
+			return err
+		}
 	} else {
 		switch a.outputType {
-			case "V":
-				argsId = 1
-			case "C":
-				argsId = 2
-			case "M":
-				argsId = 5
-			default:
-				err := fmt.Errorf("invalid output arguments provide: %v ; from slice of size: %v with the contents: %v", arg, argsSize, args)
-				checkError(err)
-				return err
-			}	
+		case "V":
+			argsId = 1
+		case "C":
+			argsId = 2
+		case "M":
+			argsId = 5
+		default:
+			err := fmt.Errorf("invalid output arguments provide: %v of size %v", a.outputType, argsSize)
+			checkError(err)
+			return err
 		}
-	
+	}
+
 	switch argsId {
 	case 1: // verbose
 		verboseOutput()
@@ -89,7 +90,7 @@ func (a *Application) selectOutput() error {
 	case 3: // verbose cli only
 		verboseCliOutput()
 	case 5: // markdown only
-		m*arkdownOnlyOutput()
+		markdownOnlyOutput()
 	case 6: // verbose markdown
 		verboseMarkdownOutput()
 	case 0:
@@ -101,6 +102,7 @@ func (a *Application) selectOutput() error {
 	}
 	return nil
 }
+
 // Restructure err, 0, 0
 func checkError(err error) error {
 	if err != nil {
@@ -474,7 +476,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	appStartTime := time.Now().UTC()
+	appStartTime := time.Now()
 
 	dateFormatted := appStartTime.Format("2006-01-01")
 	nameBuilder := strings.Builder{}
@@ -490,12 +492,11 @@ func main() {
 	app.multiDaily = false
 	app.noGzhodanConfig = false
 	app.statistics = Statistics{}
-	app.statistics.appStartTime = appStartTime
+	app.statistics.appStartTime = appStartTime.UTC()
 	app.tmpDir = os.TempDir()
 	app.statistics.operatingSystem = runtime.GOOS
-	now := time.Now().UTC()
-	app.statistics.date = //
-	app.statistics.year = strconv.Itoa(now.Year())
+	app.statistics.date = appStartTime
+	app.statistics.year = ""
 
 	err := app.handleArgs(args, argsLen)
 	if err != nil {
@@ -564,12 +565,25 @@ func main() {
 	// parse titles if it not in historic data -------- yes because why visit a url if the title is not worth checking
 	//
 
+	// Move to the correct place
+	// Find all instances of regexp
+	hrefPathAndTitlesRegexp := regexp.MustCompile(`<a href="\/.{1,}<\/a>`)
+
+	// For each url get all the paths and make urls, get all titles and store in a map
+	for _, hrefPathAndTitle := range basePageAllHrefs {
+		doubleQuoteSplitHref := strings.SplitAfterN(hrefPathAndTitle, "\"", -1)
+		titleTmp := strings.Replace(doubleQuoteSplitHref[2], ">", "")
+		titleFinal := strings.Replace(titleTmp, "</a", "")
+		linkUrl := siteUrl + doubleQuoteSplitHref[1]
+	}
+
+	// Check urls with that of the historicData file
+
+	//
 	// Load tokens into memory
 	tokensBuffer, tokenBufferSize, err := app.loadTokensIntoMem()
-
 	failedLinksAndTitleByDomainMap := make(map[string]map[string]string)
-
-	assignTokenBufferOffsets()
+	offsets, err := assignTokenBufferOffsets()
 	go func() {
 		titleCheckResult, err = parseTitles(tokenOffset)
 		if !titleCheckResult {
@@ -624,11 +638,11 @@ func main() {
 	// Storage 2 files one .csv per run and collective with Page rating, time, url, matched tokens, And just previous-urls-found-only.list
 	// compare maps for domain against previous enumerated list file with gzlop
 	// Print Alert - similiar to each row of .csv of urls
- 
+
 	// Another kick in the really would like gzhobin data files
 	backupDataStorage()
 
-	// Another kick the really would like gzhobin data files 
+	// Another kick the really would like gzhobin data files
 	updateDataStorage()
 
 	// Output cli, file and (backup and then) organise historic data
@@ -638,7 +652,6 @@ func main() {
 	}
 
 }
-
 
 // REASONS keys for failed-map so that it makes sense
 
@@ -666,7 +679,7 @@ func marshallParserResults(goodPage bool, matchedTokens string, url string) erro
 // -
 // -
 func getAllTitlesAndLinks(basePagesStdoutMap map[string]string) (map[string]map[int]string, error) {
-	arstechnicaTokensMap, portswiggerTokensMap, thehackernewsTokensMap, sansTokensMap := make(map[int]string), make(map[int]string), make(map[int]string), make(map[int]string)
+	arstechnicaTokensMap, thehackernewsTokensMap, sansTokensMap := make(map[int]string), make(map[int]string), make(map[int]string), make(map[int]string)
 	for key, value := range basePagesStdoutMap {
 		domain, err := urlKeyToDomainString(key)
 		checkError(err)
@@ -677,9 +690,6 @@ func getAllTitlesAndLinks(basePagesStdoutMap map[string]string) (map[string]map[
 		switch domain {
 		case "arstechnica.com":
 			arstechnicaTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
-			checkError(err)
-		case "portswigger.net": // portswigger -> links are just title strings.Join(titleNoAtags, "-")
-			portswiggerTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
 			checkError(err)
 		case "thehackernews.com":
 			thehackernewsTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
@@ -696,7 +706,7 @@ func getAllTitlesAndLinks(basePagesStdoutMap map[string]string) (map[string]map[
 		domain = ""
 	}
 	resultMap := make(map[string]map[int]string)
-	resultMap["arstechnica.com"], resultMap["portswigger.net"], resultMap["thehackernews.com"], resultMap["www.sans.org"] = arstechnicaTokensMap, portswiggerTokensMap, thehackernewsTokensMap, sansTokensMap
+	resultMap["arstechnica.com"], resultMap["thehackernews.com"], resultMap["www.sans.org"] = arstechnicaTokensMap, thehackernewsTokensMap, sansTokensMap
 
 	return resultMap, nil
 }
