@@ -19,17 +19,18 @@ import (
 )
 
 type Application struct {
-	appDir          string
-	tmpDir          string
-	testDir         string
-	previousRuntime string
-	statistics      Statistics
-	noGzhodanConfig bool
-	multiDaily      bool
-	outputType      string
-	gzhodanConfig   string
-	optionalConfigs map[string]string
-	tokensFile      string
+	appDir               string
+	tmpDir               string
+	testDir              string
+	previousRuntime      string
+	historicDataFilePath string
+	statistics           Statistics
+	noGzhodanConfig      bool
+	multiDaily           bool
+	outputType           string
+	gzhodanConfig        string
+	optionalConfigs      map[string]string
+	tokensFile           string
 }
 
 type Statistics struct {
@@ -49,6 +50,7 @@ var (
 )
 
 // https://www.tutorialspoint.com/golang-program-to-convert-file-to-byte-array
+// TEST THIS FIRST!!!!
 func (a *Application) loadTokensIntoMem() ([]byte, int, error) {
 	exists, err := checkFileExists(a.tokensFile)
 	if err != nil || !exists {
@@ -83,6 +85,14 @@ func (a *Application) handleArgs(args []string, argsLength int) error {
 			a.appDir = args[i+1]
 		case "-m":
 			a.multiDaily = true
+		case "-H":
+			historicDataExists, err := checkFileExists(args[i+1])
+			if err != nil || !historicDataExists {
+				checkError(err, 0, 0)
+				WarningLogger.Printf("No historic data file provided to compare new url with previously enumerated data, this may take a lot longer!")
+			} else {
+				a.historicDataFilePath = args[i+1]
+			}
 		case "-O":
 			configListSlice := strings.SplitAfterN(args[i+1], ",", -1)
 			tmpmap := make(map[string]string)
@@ -449,6 +459,32 @@ func addValueToNestedStrStrMap(parentMap map[string]map[string]string, parentKey
 	childMap[childKey] = nestedValue
 }
 
+func parseAllBasePagesForLinksAndTitles(basePagesStdoutMap map[string]string) (map[string]string, error) {
+	hrefPathAndTitlesRegexp := regexp.MustCompile(`<a href="\/.{1,}<\/a>`)
+	basePageAllHrefs := make([]string, 0)
+	allUrlsAndTitles := make(map[string]string)
+	for siteUrl, page := range basePagesStdoutMap {
+		pageLines := strings.SplitAfterN(page, "\n", -1)
+		for _, line := range pageLines {
+			match, err := regexp.MatchString(hrefPathAndTitlesRegexp.String(), line)
+			if err != nil {
+				checkError(err, 0, 0)
+			}
+			if match {
+				basePageAllHrefs = append([]string{line})
+			}
+		}
+		for _, hrefPathAndTitle := range basePageAllHrefs {
+			doubleQuoteSplitHref := strings.SplitAfterN(hrefPathAndTitle, "\"", -1)
+			titleTmp := strings.Replace(doubleQuoteSplitHref[2], ">", "", -1)
+			titleFinal := strings.Replace(titleTmp, "</a", "", -1)
+			linkUrl := siteUrl + doubleQuoteSplitHref[1]
+			allUrlsAndTitles[linkUrl] = titleFinal
+		}
+	}
+	return allUrlsAndTitles, nil
+}
+
 func main() {
 	var dataDirectory, gzhodanConfig, multiDaily, noGzhodanConfig, optionalConfigs, tokensFile, markdownOnly, cliOnly, verboseOutput string
 	flag.StringVar(&noGzhodanConfig, "g", "", "Use internally hardcoded configurations")
@@ -470,12 +506,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Everything below need refactored into a method
 	appStartTime := time.Now()
-
 	dateFormatted := appStartTime.Format("2006-01-01")
 	nameBuilder := strings.Builder{}
 	nameBuilder.WriteString(dateFormatted)
-
 	nameBuilder.WriteString(".log")
 
 	InfoLogger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
@@ -497,6 +532,8 @@ func main() {
 		checkError(err, 0, 0)
 	}
 
+	// Everything below could be in its own method
+	//
 	// Later functionality when there is alot data at some point we need condensing or checking
 	// to or with a historicData file, these kind of programs need data regression to best dataset (size, quality, parsability,etc)
 	// Do not remove
@@ -541,39 +578,53 @@ func main() {
 
 	app.statistics.originalUrls = totalUrls
 	app.statistics.totalUrlsVisited += totalUrls
+	// Everything above could be in its own method
 
-	// stdout -> 4 base pages
-	// create maps for each base pages
 	basePagesStdoutMap, err := curlNewBasePages(allBaseUrlsSeq)
 	if err != nil {
 		checkError(err, 0, 0)
 	}
 
-	// Get all links and titles from Base pages
 	artefactsFromBasePages, err := parseAllBasePagesForLinksAndTitles(basePagesStdoutMap)
 	if err != nil {
 		checkError(err, 0, 0)
 	}
 
-	// go routines a plenty need to be here!
-	historicDataExists, err := checkFileExists(app.historicDataFile)
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-	if historicDataExists {
-		compareUrlsHistorically()
+	failedLinksAndTitleByDomainMap := make(map[string]map[string]string)
+
+	if app.historicDataFilePath != "" {
+		finalBaseTitlesAndLinks, err := app.compareUrlsHistorically(artefactsFromBasePages)
 	} else {
+		finalBaseTitlesAndLinks := basePagesStdoutMap
 		WarningLogger.Printf("No historic data file provided to compare new url with previously enumerated data, this may take a lot longer!")
-		parsePageTitles()
 	}
 
 	// Load tokens into memory
 	tokensBuffer, tokenBufferSize, err := app.loadTokensIntoMem()
-	failedLinksAndTitleByDomainMap := make(map[string]map[string]string)
+	//
+	//
+	// Need a thread flag
+	// Need a max threads for maths
 	offsets, err := assignTokenBufferOffsets()
 	if err != nil {
 		checkError(err, 0, 0)
 	}
+	// go routine to fork out and get the page from each link - fork by some -T threads ( threads requested % functions ) for equal links per thread
+	// Manage being able reading tokens in memory based on circular buffer 	   ([ x -> y -> z -] )
+	// So if there are three threads x,y,z they read from an offsest circularly [<- zstradle--|]
+	// make sure everything converges in a go way
+	// Manage being able reading tokens in memory based on circular buffer 	   ([ x -> y -> z -] )
+	// So if there are three threads x,y,z they read from an offsest circularly [<- zstradle--|]
+	// Curl pages to memory
+	// search for token found limit (bear in mind the amount of tokens is not large so worry about closure is not a problem)
+	// assessResult based on a config file on WHAT constitues
+	// marshall results from enumerated pages
+	// DO I need to actually worry its a read not a write?
+	// DO I actually need mutexs for maps for writes?
+	//
+	//  	artefactsFromBasePages[key]
+	//  	artefactsFromBasePages[]value
+	//
 	go func() {
 		titleCheckResult, err = parseTitles(tokenOffset)
 		if !titleCheckResult {
@@ -583,25 +634,6 @@ func main() {
 			}
 		}
 	}()
-
-	finalTitlesAndLinks, err := compareArtefactsToHistoricData()
-
-	// go routine to fork out and get the page from each link - fork by some -T threads ( threads requested % functions ) for equal links per thread
-
-	// Manage being able reading tokens in memory based on circular buffer 	   ([ x -> y -> z -] )
-	// So if there are three threads x,y,z they read from an offsest circularly [<- zstradle--|]
-
-	// make sure everything converges in a go way
-
-	// Manage being able reading tokens in memory based on circular buffer 	   ([ x -> y -> z -] )
-	// So if there are three threads x,y,z they read from an offsest circularly [<- zstradle--|]
-	// Curl pages to memory
-	// search for token found limit (bear in mind the amount of tokens is not large so worry about closure is not a problem)
-	// assessResult based on a config file on WHAT constitues
-	// marshall results from enumerated pages
-
-	// DO I need to actually worry its a read not a write?
-	// DO I actually need mutexs for maps for writes?
 
 	assignTokenBufferOffsets() // array -> tokenBufferthreadId
 	go func() {
@@ -699,46 +731,24 @@ func parsePageForTokens(domain, page string) error {
 	return nil
 }
 
-// -
-func parseAllBasePagesForLinksAndTitles(basePagesStdoutMap map[string]string) (map[string]string, error) {
-	hrefPathAndTitlesRegexp := regexp.MustCompile(`<a href="\/.{1,}<\/a>`)
-	basePageAllHrefs := make([]string, 0)
-	allUrlsAndTitles := make(map[string]string)
-	for siteUrl, page := range basePagesStdoutMap {
-		pageLines := strings.SplitAfterN(page, "\n", -1)
-		for _, line := range pageLines {
-			match, err := regexp.MatchString(hrefPathAndTitlesRegexp.String(), line)
-			if err != nil {
-				checkError(err, 0, 0)
-			}
-			if match {
-				basePageAllHrefs += append(line)
-			}
-		}
-		for _, hrefPathAndTitle := range basePageAllHrefs {
-			doubleQuoteSplitHref := strings.SplitAfterN(hrefPathAndTitle, "\"", -1)
-			titleTmp := strings.Replace(doubleQuoteSplitHref[2], ">", "", -1)
-			titleFinal := strings.Replace(titleTmp, "</a", "", -1)
-			linkUrl := siteUrl + doubleQuoteSplitHref[1]
-			allUrlsAndTitles[linkUrl] = titleFinal
-		}
-	}
-	return allUrlsAndTitles, nil
-}
+func (a *Application) compareUrlsHistoricall(urlsFound map[string]string) (map[string]string, map[string]string, error) {
+	var allUrlsAsBytes []byte
 
-func compareTitlesAndLinksToHistoricData(historicUrlsFile, tokensFile string, urlsFound map[string]string) error {
-	var urlsAsBytes []byte
+	// LoadingTokensCode into memory is incorrect!!
 
-	file, err := os.ReadFile(historicUrlsFile)
-	if err != nil {
-		checkError(err, 0, 0)
+	for urlKey, _ := range urlsFound {
+		allUrlsAsBytes = append([]byte(urlKey))
 	}
 
-	for _, url := range urlsFound {
-		urlAsBytes := []byte(url)
-		append(urlsAsBytes, urlAsBytes[:])
+	goodUrls := make(map[string]string)
+	badUrls := make(map[string]string)
+
+	for _, urlAsBytes := range allUrlsAsBytes {
+		// Scan the fileAsBytesBuffer for url
+		// if found store
 	}
 
+	return goodUrls, badUrls, nil
 }
 
 func wtfisthislackofsleepin2024() {
