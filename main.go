@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net/url"
 	"os"
@@ -49,32 +48,19 @@ var (
 	ErrorLogger   *log.Logger
 )
 
-// https://www.tutorialspoint.com/golang-program-to-convert-file-to-byte-array
-// TEST THIS FIRST!!!!
+// https://gobyexample.com/reading-files
 func (a *Application) loadTokensIntoMem() ([]byte, int, error) {
 	exists, err := checkFileExists(a.tokensFile)
 	if err != nil || !exists {
 		checkError(err, 0, 0)
 	}
-	tokensFile, err := os.Open(a.tokensFile)
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-	defer tokensFile.Close()
-
-	stat, err := tokensFile.Stat()
+	tokensFileAsBytes, err := os.ReadFile(a.tokensFile)
 	if err != nil {
 		checkError(err, 0, 0)
 	}
 
-	byteSlice := make([]byte, stat.Size())
-	_, err = bufio.NewReader(tokensFile).Read(byteSlice)
-	if err != nil && err != io.EOF {
-		checkError(err, 0, 0)
-		return nil, 0, err
-	}
-	bsSize := len(byteSlice)
-	return byteSlice, bsSize, nil
+	bsSize := len(tokensFileAsBytes)
+	return tokensFileAsBytes, bsSize, nil
 }
 
 func (a *Application) handleArgs(args []string, argsLength int) error {
@@ -226,6 +212,54 @@ func checkError(err error, errorLevel, errorCode int) {
 		err := fmt.Errorf("incorrect errorlevel integer: %v by errorcode: %v", errorLevel, errorCode)
 		log.Fatal(err)
 	}
+}
+
+func (a *Application) compareUrlsHistorically(urlsFound map[string]string) (map[string]map[string]string, map[string]map[string]string, error) {
+	var allUrlsAsBytes []byte
+	var domain, url string = "", ""
+	exists, err := checkFileExists(a.historicDataFilePath)
+	if err != nil || !exists {
+		checkError(err, 0, 0)
+	}
+	historicDataAsBytes, err := os.ReadFile(a.historicDataFilePath)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+
+	allTitles := make(map[int]string)
+	i := 0
+	for urlKey, titleValue := range urlsFound {
+		allUrlsAsBytes = append([]byte(urlKey))
+		allTitles[i] = titleValue
+		i++
+	}
+
+	goodUrls := make(map[string]map[string]string)
+	badUrls := make(map[string]map[string]string)
+
+	dateAsBytesSize := len(historicDataAsBytes)
+	for _, urlAsBytes := range allUrlsAsBytes {
+		for i := 0; i <= dateAsBytesSize-1; i++ {
+			if historicDataAsBytes[i] == urlAsBytes {
+				url = string(urlAsBytes)
+				domain, err = urlKeyToDomainString(url)
+				if err != nil {
+					checkError(err, 0, 0)
+				}
+				addValueToNestedStrStrMap(goodUrls, domain, url, allTitles[i])
+				domain, url = "", ""
+			} else {
+				url = string(urlAsBytes)
+				domain, err = urlKeyToDomainString(url)
+				if err != nil {
+					checkError(err, 0, 0)
+				}
+				addValueToNestedStrStrMap(badUrls, domain, url, allTitles[i])
+			}
+		}
+	}
+
+	return goodUrls, badUrls, nil
 }
 
 func urlKeyToDomainString(keyUrl string) (string, error) {
@@ -593,7 +627,7 @@ func main() {
 	failedLinksAndTitleByDomainMap := make(map[string]map[string]string)
 
 	if app.historicDataFilePath != "" {
-		finalBaseTitlesAndLinks, err := app.compareUrlsHistorically(artefactsFromBasePages)
+		foundBaseLinks, foundHistoricLinks, err := app.compareUrlsHistorically(artefactsFromBasePages)
 	} else {
 		finalBaseTitlesAndLinks := basePagesStdoutMap
 		WarningLogger.Printf("No historic data file provided to compare new url with previously enumerated data, this may take a lot longer!")
@@ -733,8 +767,15 @@ func parsePageForTokens(domain, page string) error {
 
 func (a *Application) compareUrlsHistoricall(urlsFound map[string]string) (map[string]string, map[string]string, error) {
 	var allUrlsAsBytes []byte
-
-	// LoadingTokensCode into memory is incorrect!!
+	var domain, url string = ""
+	exists, err := checkFileExists(a.historicDataFilePath)
+	if err != nil || !exists {
+		checkError(err, 0, 0)
+	}
+	historicDataAsBytes, err := os.ReadFile(a.historicDataFilePath)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
 
 	for urlKey, _ := range urlsFound {
 		allUrlsAsBytes = append([]byte(urlKey))
@@ -742,10 +783,28 @@ func (a *Application) compareUrlsHistoricall(urlsFound map[string]string) (map[s
 
 	goodUrls := make(map[string]string)
 	badUrls := make(map[string]string)
-
+	dateAsBytesSize := len(historicDataAsBytes)
 	for _, urlAsBytes := range allUrlsAsBytes {
-		// Scan the fileAsBytesBuffer for url
-		// if found store
+
+		for i := 0; i <= dateAsBytesSize-1; i++ {
+			if historicDataAsBytes[i] == urlAsBytes {
+				url = string(urlAsBytes)
+				domain, err = urlKeyToDomainString(url)
+				if err != nil {
+					checkError(err, 0, 0)
+				}
+				badUrls[domain] = url
+				domain, url = "", ""
+			} else {
+				url = string(urlAsBytes)
+				domain, err = urlKeyToDomainString(url)
+				if err != nil {
+					checkError(err, 0, 0)
+				}
+				badUrls[domain] = url
+				domain, url = "", ""
+			}
+		}
 	}
 
 	return goodUrls, badUrls, nil
