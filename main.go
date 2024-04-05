@@ -671,7 +671,7 @@ func main() {
 
 	assignTokenBufferOffsets() // array -> tokenBufferthreadId
 	go func() {
-		page, err = curlNewArticle(url)
+		page, err := curlNewArticle(url)
 		if err != nil {
 			checkError(err, 0, 0)
 		}

@@ -1,5 +1,10 @@
 # Dev
 
+https://golongwithgolang.com/thread-safety-in-golang
+https://gobyexample.com/goroutines
+https://medium.com/@sairavitejachintakrindi/goroutines-and-threads-exploring-concurrency-in-go-370d609038c
+https://medium.com/@brenomachadodomonte/multithreading-with-go-routines-in-golang-7e8fcd33be81
+https://golangdocs.com/channels-in-golang
 
 #### Objectives
 
