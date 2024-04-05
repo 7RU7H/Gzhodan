@@ -42,6 +42,26 @@ type Statistics struct {
 	appStartTime     time.Time
 }
 
+type CircularBuffer struct {
+	buffer       []byte
+	size         int
+	readPointers []int
+}
+
+func newCircularBuffer(data []byte, concurrencyOffset, workers int) *CircularBuffer {
+	return &CircularBuffer{
+		buffer:       data,
+		size:         len(data) - 1,
+		readPointers: make([]int, concurrencyOffset*workers),
+	}
+}
+
+func (c *CircularBuffer) readCircularBufferFromOffset(worker int) (data byte) {
+	data = c.buffer[c.readPointers[worker]]
+	c.readPointers[worker] = (c.readPointers[worker] + 1) % c.size
+	return data
+}
+
 var (
 	WarningLogger *log.Logger
 	InfoLogger    *log.Logger
@@ -59,7 +79,7 @@ func (a *Application) loadTokensIntoMem() ([]byte, int, error) {
 		checkError(err, 0, 0)
 	}
 
-	bsSize := len(tokensFileAsBytes)
+	bsSize := len(tokensFileAsBytes) - 1
 	return tokensFileAsBytes, bsSize, nil
 }
 
@@ -614,6 +634,10 @@ func main() {
 	app.statistics.totalUrlsVisited += totalUrls
 	// Everything above could be in its own method
 
+	// Consider implecations of full implecation at some point...
+	var defaultThreadCount int = 10
+	threadCount := defaultThreadCount
+
 	basePagesStdoutMap, err := curlNewBasePages(allBaseUrlsSeq)
 	if err != nil {
 		checkError(err, 0, 0)
@@ -625,12 +649,24 @@ func main() {
 	}
 
 	failedLinksAndTitleByDomainMap := make(map[string]map[string]string)
+	foundHistoricLinks := make(map[string]map[string]string)
 
 	if app.historicDataFilePath != "" {
 		foundBaseLinks, foundHistoricLinks, err := app.compareUrlsHistorically(artefactsFromBasePages)
+		if err != nil {
+			checkError(err, 0, 0)
+		}
 	} else {
-		finalBaseTitlesAndLinks := basePagesStdoutMap
+		foundBaseLinks := basePagesStdoutMap
 		WarningLogger.Printf("No historic data file provided to compare new url with previously enumerated data, this may take a lot longer!")
+	}
+
+	// Collect Duplicate URLs
+	if foundHistoricLinks != nil {
+		err := appendFalsePositiveDataToNextLTS(foundHistoricLinks)
+		if err != nil {
+			checkError(err, 0, 0)
+		}
 	}
 
 	// Load tokens into memory
@@ -639,7 +675,7 @@ func main() {
 	//
 	// Need a thread flag
 	// Need a max threads for maths
-	offsets, err := assignTokenBufferOffsets()
+	offsets, err := assignTokenBufferOffsets(tokenBufferSize, threadCount)
 	if err != nil {
 		checkError(err, 0, 0)
 	}
@@ -763,51 +799,6 @@ func parsePageForTokens(domain, page string) error {
 	}
 	//  domain = "" // for loop from previous
 	return nil
-}
-
-func (a *Application) compareUrlsHistoricall(urlsFound map[string]string) (map[string]string, map[string]string, error) {
-	var allUrlsAsBytes []byte
-	var domain, url string = ""
-	exists, err := checkFileExists(a.historicDataFilePath)
-	if err != nil || !exists {
-		checkError(err, 0, 0)
-	}
-	historicDataAsBytes, err := os.ReadFile(a.historicDataFilePath)
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-
-	for urlKey, _ := range urlsFound {
-		allUrlsAsBytes = append([]byte(urlKey))
-	}
-
-	goodUrls := make(map[string]string)
-	badUrls := make(map[string]string)
-	dateAsBytesSize := len(historicDataAsBytes)
-	for _, urlAsBytes := range allUrlsAsBytes {
-
-		for i := 0; i <= dateAsBytesSize-1; i++ {
-			if historicDataAsBytes[i] == urlAsBytes {
-				url = string(urlAsBytes)
-				domain, err = urlKeyToDomainString(url)
-				if err != nil {
-					checkError(err, 0, 0)
-				}
-				badUrls[domain] = url
-				domain, url = "", ""
-			} else {
-				url = string(urlAsBytes)
-				domain, err = urlKeyToDomainString(url)
-				if err != nil {
-					checkError(err, 0, 0)
-				}
-				badUrls[domain] = url
-				domain, url = "", ""
-			}
-		}
-	}
-
-	return goodUrls, badUrls, nil
 }
 
 func wtfisthislackofsleepin2024() {
