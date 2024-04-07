@@ -48,6 +48,35 @@ type CircularBuffer struct {
 	readPointers []int
 }
 
+type MatchOnTitles struct {
+	url    string
+	titles string
+	tokens []string
+	count  int
+}
+
+func newMatchOnTitlesBuilder() *MatchOnTitles {
+	return &MatchOnTitles{}
+}
+
+func (m *MatchOnTitles) Url(url string) *MatchOnTitles {
+	m.url = url
+	return m
+}
+func (m *MatchOnTitles) Titles(titles string) *MatchOnTitles {
+	m.titles = titles
+	return m
+}
+
+func (m *MatchOnTitles) Build() MatchOnTitles {
+	return MatchOnTitles{
+		url:    m.url,
+		titles: m.titles,
+		tokens: make([]string, 0),
+		count:  0,
+	}
+}
+
 func newCircularBuffer(data []byte, concurrencyOffset, workers int) *CircularBuffer {
 	return &CircularBuffer{
 		buffer:       data,
@@ -674,36 +703,58 @@ func main() {
 	}
 	workerCount, offset := 0, 0 // calcThreadsToOffsets(tokenArrayLen, other)
 
-	tokensBuffer := newCircularBuffer(tokensArray, offset, workerCount)
+	TokensBuffer := newCircularBuffer(tokensArray, offset, workerCount)
 	workerOffsets, err := tokensBuffer.assignReadPointerOffsets()
 	if err != nil {
 		checkError(err, 0, 0)
 	}
 
-	// For every title -> parse with tokens (I just want to do this parallel)
-	passedLinksAndTitleByDomainMap := make(map[string]map[string]string) 
+	// I WANT PARALELLISM! STILL
+	passedLinksAndTitleByDomainMap := make(map[string]map[string]string)
+	titleTokeniserResults := make(map[string]*MatchesOnTitles)
+	motBuilder := newMatchOnTitlesBuilder()
 	for key, _ := range foundBaseLinks {
-		for _, value := range foundBaseLinks[key] {
-
+		for subKey, value := range foundBaseLinks[key] {
+			var buffer bytes.Buffer
+			domUrlMoT := motBuilder.
+				Url(subKey).
+				Titles(value).
+				Build()
+			titlesAsBytes := byte(value)
+			matchThreshold := 5
+			for i, matchesFound := 0, 0; i <= tokensArrayLen-1; i++ {
+				if matchThreshold != matchesFound {
+					for j := 0; j <= len(titlesAsBytes)-1; j++ {
+						buffer.WriteByte(TokensBuffer.readCircularBufferFromOffset(workerID))
+						token := buffer.Bytes()
+						match := bytes.Compare(titlesAsBytes[j], token)
+						if match != 0 {
+							domUrlMoT.tokens = append(domUrlMoT.tokens, buffer.String())
+							matchesFound = +match
+						}
+					}
+				} else {
+					domUrlMoT.count = matchesFound
+					break
+				}
+			}
+			titleTokeniserResults[key] = domUrlMoT
 		}
 	}
 
-	// either multiple works at equal or almost equal distance do a fraction of comparisons - mutex on matchCount 
-	go func(worker int, key, subKey, value string) {
-		token := tokensBuffer.readCircularBufferFromOffset(worker)
-
-		// Streams of tokens -> titles
-
-		titleCheckResult, matchCount err = parseTitles() // 0: err; 1 negative; 2 positive
-		switch titleCheckResult {
-		case 0:
+	for key, value := range titleTokeniserResults {
+		domain, err := urlKeyToDomainString(value.url)
+		if err != nil {
 			checkError(err, 0, 0)
-		case 1:
-			addValueToNestedStrStrMap(failedLinksAndTitleByDomainMap, key, subKey, value)
-		case 2:
-			addValueToNestedStrStrMap(passedLinksAndTitleByDomainMap, key, subKey, value)
 		}
-	}()
+		switch value.count; {
+		case value.count > 1:
+			addValueToNestedStrStrMap(failedLinksAndTitleByDomainMap, domain, value.url, value.titles)
+			delete(titleTokeniserResults, key)
+		default:
+			addValueToNestedStrStrMap(passedLinksAndTitleByDomainMap, key, value.url, value.titles)
+		}
+	}
 
 	// Need a thread flag
 	// Need a max threads for maths
