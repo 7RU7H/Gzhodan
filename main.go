@@ -79,8 +79,8 @@ func (a *Application) loadTokensIntoMem() ([]byte, int, error) {
 		checkError(err, 0, 0)
 	}
 
-	bsSize := len(tokensFileAsBytes) - 1
-	return tokensFileAsBytes, bsSize, nil
+	bsLen := len(tokensFileAsBytes)
+	return tokensFileAsBytes, bsLen, nil
 }
 
 func (a *Application) handleArgs(args []string, argsLength int) error {
@@ -663,22 +663,28 @@ func main() {
 
 	// Collect Duplicate URLs
 	if foundHistoricLinks != nil {
-		err := appendFalsePositiveDataToNextLTS(foundHistoricLinks)
+		// loop over foundHistoricLinks and :
+		err := addValueToNestedStrStrMap(failedLinksAndTitleByDomainMap, domain, url, title)
+		if err != nil {
+			checkError(err, 0, 0)
+		}
 		if err != nil {
 			checkError(err, 0, 0)
 		}
 	}
 
 	// Load tokens into memory
-	tokensBuffer, tokenBufferSize, err := app.loadTokensIntoMem()
-	//
-	//
-	// Need a thread flag
-	// Need a max threads for maths
-	offsets, err := assignTokenBufferOffsets(tokenBufferSize, threadCount)
+	tokensArray, tokenArrayLen, err := app.loadTokensIntoMem()
 	if err != nil {
 		checkError(err, 0, 0)
 	}
+	workerCount, offset := 0, 0 // calcThreadsToOffsets(tokenArrayLen, other)
+
+	tokensBuffer := newCircularBuffer(tokensArray, offset, workerCount)
+	tokensBuffer.assignReadPointerOffsets()
+
+	// Need a thread flag
+	// Need a max threads for maths
 	// go routine to fork out and get the page from each link - fork by some -T threads ( threads requested % functions ) for equal links per thread
 	// Manage being able reading tokens in memory based on circular buffer 	   ([ x -> y -> z -] )
 	// So if there are three threads x,y,z they read from an offsest circularly [<- zstradle--|]
@@ -705,7 +711,6 @@ func main() {
 		}
 	}()
 
-	assignTokenBufferOffsets() // array -> tokenBufferthreadId
 	go func() {
 		page, err := curlNewArticle(url)
 		if err != nil {
