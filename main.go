@@ -649,48 +649,67 @@ func main() {
 	}
 
 	failedLinksAndTitleByDomainMap := make(map[string]map[string]string)
-	foundHistoricLinks := make(map[string]map[string]string)
 
+	// Make into a method!
+	// foundBaseLinks, foundHistoricLinks := make(map[string]map[string]string)
 	if app.historicDataFilePath != "" {
 		foundBaseLinks, foundHistoricLinks, err := app.compareUrlsHistorically(artefactsFromBasePages)
 		if err != nil {
 			checkError(err, 0, 0)
+		}
+		for key, _ := range foundHistoricLinks {
+			for subKey, value := range foundHistoricLinks[key] {
+				addValueToNestedStrStrMap(failedLinksAndTitleByDomainMap, key, subKey, value)
+			}
 		}
 	} else {
 		foundBaseLinks := basePagesStdoutMap
 		WarningLogger.Printf("No historic data file provided to compare new url with previously enumerated data, this may take a lot longer!")
 	}
 
-	// Collect Duplicate URLs
-	if foundHistoricLinks != nil {
-		// loop over foundHistoricLinks and :
-		err := addValueToNestedStrStrMap(failedLinksAndTitleByDomainMap, domain, url, title)
-		if err != nil {
-			checkError(err, 0, 0)
-		}
-		if err != nil {
-			checkError(err, 0, 0)
-		}
-	}
-
 	// Load tokens into memory
-	tokensArray, tokenArrayLen, err := app.loadTokensIntoMem()
+	tokensArray, tokensArrayLen, err := app.loadTokensIntoMem()
 	if err != nil {
 		checkError(err, 0, 0)
 	}
 	workerCount, offset := 0, 0 // calcThreadsToOffsets(tokenArrayLen, other)
 
 	tokensBuffer := newCircularBuffer(tokensArray, offset, workerCount)
-	tokensBuffer.assignReadPointerOffsets()
+	workerOffsets, err := tokensBuffer.assignReadPointerOffsets()
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+
+	// For every title -> parse with tokens (I just want to do this parallel)
+	passedLinksAndTitleByDomainMap := make(map[string]map[string]string) 
+	for key, _ := range foundBaseLinks {
+		for _, value := range foundBaseLinks[key] {
+
+		}
+	}
+
+	// either multiple works at equal or almost equal distance do a fraction of comparisons - mutex on matchCount 
+	go func(worker int, key, subKey, value string) {
+		token := tokensBuffer.readCircularBufferFromOffset(worker)
+
+		// Streams of tokens -> titles
+
+		titleCheckResult, matchCount err = parseTitles() // 0: err; 1 negative; 2 positive
+		switch titleCheckResult {
+		case 0:
+			checkError(err, 0, 0)
+		case 1:
+			addValueToNestedStrStrMap(failedLinksAndTitleByDomainMap, key, subKey, value)
+		case 2:
+			addValueToNestedStrStrMap(passedLinksAndTitleByDomainMap, key, subKey, value)
+		}
+	}()
 
 	// Need a thread flag
 	// Need a max threads for maths
-	// go routine to fork out and get the page from each link - fork by some -T threads ( threads requested % functions ) for equal links per thread
-	// Manage being able reading tokens in memory based on circular buffer 	   ([ x -> y -> z -] )
-	// So if there are three threads x,y,z they read from an offsest circularly [<- zstradle--|]
-	// make sure everything converges in a go way
-	// Manage being able reading tokens in memory based on circular buffer 	   ([ x -> y -> z -] )
-	// So if there are three threads x,y,z they read from an offsest circularly [<- zstradle--|]
+
+	// -
+
 	// Curl pages to memory
 	// search for token found limit (bear in mind the amount of tokens is not large so worry about closure is not a problem)
 	// assessResult based on a config file on WHAT constitues
@@ -701,15 +720,6 @@ func main() {
 	//  	artefactsFromBasePages[key]
 	//  	artefactsFromBasePages[]value
 	//
-	go func() {
-		titleCheckResult, err = parseTitles(tokenOffset)
-		if !titleCheckResult {
-			err := addValueToNestedStrStrMap(failedLinksAndTitleByDomainMap, url, url, title)
-			if err != nil {
-				checkError(err, 0, 0)
-			}
-		}
-	}()
 
 	go func() {
 		page, err := curlNewArticle(url)
