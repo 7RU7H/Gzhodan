@@ -194,7 +194,8 @@ func (a *Application) handleArgs(args []string, argsLength int) error {
 func (a *Application) selectOutput() error {
 	argsSize := len(a.outputType)
 	var argsId int = 0
-	if argsSize != 1 {
+	switch argsSize {
+	case 3:
 		switch a.outputType {
 		case "C-V":
 			argsId = 3
@@ -205,12 +206,11 @@ func (a *Application) selectOutput() error {
 		case "V-M":
 			argsId = 7
 		default:
-			argsId = 0
 			err := fmt.Errorf("invalid output arguments provide: %v ; from slice of size: %v", a.outputType, argsSize)
 			checkError(err, 0, 0)
 			return err
 		}
-	} else {
+	case 1:
 		switch a.outputType {
 		case "V":
 			argsId = 1
@@ -223,21 +223,27 @@ func (a *Application) selectOutput() error {
 			checkError(err, 0, 0)
 			return err
 		}
+	case 0:
+		argsId = 0
+	default:
+		err := fmt.Errorf("invalid output arguments provide: %v of size %v", a.outputType, argsSize)
+		checkError(err, 0, 0)
+		return err
 	}
 
 	switch argsId {
 	case 1: // verbose
-		verboseOutput()
+		verboseOutput(a)
 	case 2: // cli only
-		cliOnlyOutput()
+		cliOnlyOutput(a)
 	case 3: // verbose cli only
-		verboseCliOutput()
+		verboseCliOutput(a)
 	case 5: // markdown only
-		markdownOnlyOutput()
+		markdownOnlyOutput(a)
 	case 6: // verbose markdown
-		verboseMarkdownOutput()
+		verboseMarkdownOutput(a)
 	case 0:
-		defaultOutput()
+		defaultOutput(a)
 	default:
 		err := fmt.Errorf("invalid arg idenfier counted %v", argsId)
 		checkError(err, 0, 0)
@@ -831,7 +837,7 @@ func main() {
 	}
 
 	// Output cli, file and (backup and then) organise historic data
-	err = selectOutput(outputArgs)
+	err = app.selectOutput()
 	if err != nil {
 		checkError(err, 0, 0)
 	}
@@ -845,28 +851,29 @@ func main() {
 // -
 
 // verboseOutput - markdown + verbose markdown report, cli is verbose
-func verboseOutput() {
+func verboseOutput(app *Application) {
+	verboseCliOutput(app)
+	verboseMarkdownOutput(app)
+}
+
+func cliOnlyOutput(app *Application) {
 
 }
 
-func cliOnlyOutput() {
+func markdownOnlyOutput(app *Application) {
 
 }
 
-func markdownOnlyOutput() {
+func verboseCliOutput(app *Application) {
 
 }
 
-func verboseCliOutput() {
-
-}
-
-func verboseMarkdownOutput() {
+func verboseMarkdownOutput(app *Application) {
 
 }
 
 // defaultOutput - cli some app.statistics.stics and markdown report
-
-func defaultOutput() {
-
+func defaultOutput(app *Application) {
+	cliOnlyOutput(app)
+	markdownOnlyOutput(app)
 }
