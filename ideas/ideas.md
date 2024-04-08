@@ -177,4 +177,124 @@ func compareCurrAndLastGzhobins() error {
 	}
 
 }
+
+// Curl pages to memory
+	// search for token found limit (bear in mind the amount of tokens is not large so worry about closure is not a problem)
+	// assessResult based on a config file on WHAT constitues
+	// marshall results from enumerated pages
+	// DO I need to actually worry its a read not a write?
+	// DO I actually need mutexs for maps for writes?
+	//
+	//  	artefactsFromBasePages[key]
+	//  	artefactsFromBasePages[]value
+	//
+	
+
+	go func() {
+		page, err := curlNewArticle(url)
+		if err != nil {
+			checkError(err, 0, 0)
+		}
+		matchedTokens, goodPage, err := parsePage(page, tokenOffset)
+		if err != nil {
+			checkError(err, 0, 0)
+		}
+		err := marshallParserResults(goodPage, matchedTokens, url)
+		if err != nil {
+			checkError(err, 0, 0)
+		}
+	}()
+	// make sure everything converges in a go way
+
+	for _, url := range passedLinksAndTitleByDomainMap {
+		page, err := curlNewArticle(url)
+		if err != nil {
+			checkError(err, 0, 0)
+		}
+	}
+
+// REASONS keys for failed-map so that it makes sense
+func marshallParserResults(goodPage bool, matchedTokens string, url string) error {
+	if !goodPage {
+		// remove url from queue,
+		addValueToNestedStrStrMap(failedLinksAndTitleByDomainMap, "Parsed-Page-Results-Negative", url, titles)
+	} else {
+
+	}
+	return nil
+}
+
+func ingestPagesTokensMap(tokens []byte) (map[string]map[int]string, error) {
+	arstechnicaTokensMap, thehackernewsTokensMap, sansTokensMap := make(map[int]string), make(map[int]string), make(map[int]string), make(map[int]string)
+	// do stuff
+
+	resultMap := make(map[string]map[int]string)
+	resultMap["arstechnica.com"], resultMap["thehackernews.com"], resultMap["www.sans.org"] = arstechnicaTokensMap, thehackernewsTokensMap, sansTokensMap
+
+	return resultMap, nil
+}
+
+func parsePageForTokens(domain, page string) error {
+	domain, err := urlKeyToDomainString(key)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+	webPageBuffer := bytes.NewBuffer([]byte(page))
+	switch domain {
+	case "arstechnica.com":
+		arstechnicaTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
+		if err != nil {
+			checkError(err, 0, 0)
+		}
+	case "thehackernews.com":
+		thehackernewsTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
+		if err != nil {
+			checkError(err, 0, 0)
+		}
+	case "www.sans.org":
+		sansTokensMap, err = gzlopBuffer(webPageBuffer, tokens)
+		if err != nil {
+			checkError(err, 0, 0)
+		}
+	case "":
+		err := fmt.Errorf("strange race condition occur with domain variable being an empty string")
+		if err != nil {
+			checkError(err, 0, 0)
+		}
+	default:
+
+	}
+	//  domain = "" // for loop from previous
+	return nil
+}
+
+func wtfisthislackofsleepin2024() {
+
+	searchTokens, err := os.ReadFile(tokensFile)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+	// TODO
+
+	// map memory - for the same ~~paragraph~~ search for dates, url and tokens
+	// soup go gets all the fields that have urls like gospider (CHECK HOW THAT WORK and do it locally)
+	// gzlop buffer can then be adapter to search the buffer from address to offset for EVEN MORE SPEED
+
+	// Naive Search for a token
+
+	allTheArtefacts := make(map[int]map[int]string)
+	for _, token := range searchTokens {
+		artifacts, err := gzlopBuffer(file, token)
+		if err != nil {
+			checkError(err, 0, 0)
+		}
+		// WTF
+		// allTheArtefacts[] = artifacts
+	}
+	//
+	// BRAIN NEED THUNK HERE
+	//
+	return nil
+
+}
 ```
