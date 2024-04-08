@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/url"
 	"os"
@@ -568,6 +569,61 @@ func parseAllBasePagesForLinksAndTitles(basePagesStdoutMap map[string]string) (m
 	return allUrlsAndTitles, nil
 }
 
+func defangUrl(inputUrl string) string {
+	tmpUrl := strings.ReplaceAll(inputUrl, "http", "hxxp")
+	tmpUrl = strings.ReplaceAll(tmpUrl, "://", "[://]")
+	outputUrl := strings.ReplaceAll(tmpUrl, ".", "[.]")
+	return outputUrl
+}
+
+// https://gosamples.dev/write-file/
+func updateDataStorage(file string, passed map[string]map[string]string, failed map[string]map[string]string) error {
+	f, err := os.Open(file)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+	defer f.Close()
+	for key, _ := range passed {
+		for subKey, _ := range passed[key] {
+			_, err := f.WriteString(subKey + "\n")
+			if err != nil {
+				checkError(err, 0, 0)
+			}
+		}
+	}
+	for key, _ := range failed {
+		for subKey, _ := range failed[key] {
+			_, err := f.WriteString(subKey + "\n")
+			if err != nil {
+				checkError(err, 0, 0)
+			}
+		}
+	}
+	return nil
+}
+
+// https://zetcode.com/golang/copyfile/
+func backupDataStorage(src string) error {
+	fin, err := os.Open(src)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+	defer fin.Close()
+
+	dst := fin.Name() + ".bak"
+	fout, err := os.Create(dst)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+	defer fout.Close()
+
+	_, err = io.Copy(fout, fin)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+	return nil
+}
+
 func main() {
 	var dataDirectory, gzhodanConfig, multiDaily, noGzhodanConfig, optionalConfigs, tokensFile, markdownOnly, cliOnly, verboseOutput string
 	flag.StringVar(&noGzhodanConfig, "g", "", "Use internally hardcoded configurations")
@@ -708,7 +764,6 @@ func main() {
 		checkError(err, 0, 0)
 	}
 
-	passedLinksAndTitleByDomainMap := make(map[string]map[string]string)
 	titleTokeniserResults := make(map[string]*MatchesOnTitles)
 	motBuilder := newMatchOnTitlesBuilder()
 	for key, _ := range foundBaseLinks {
@@ -740,6 +795,8 @@ func main() {
 		}
 	}
 
+	passedTokenisedLinksAndTitleByDomainMap := make(map[string]map[string]string)
+	failedTokenisedLinksAndTitleByDomainMap := make(map[string]map[string]string)
 	for key, value := range titleTokeniserResults {
 		domain, err := urlKeyToDomainString(value.url)
 		if err != nil {
@@ -747,10 +804,10 @@ func main() {
 		}
 		switch value.count; {
 		case value.count > 1:
-			addValueToNestedStrStrMap(failedLinksAndTitleByDomainMap, domain, value.url, value.titles)
+			addValueToNestedStrStrMap(failedTokenisedLinksAndTitleByDomainMap, domain, value.url, value.titles)
 			delete(titleTokeniserResults, key)
 		default:
-			addValueToNestedStrStrMap(passedLinksAndTitleByDomainMap, key, value.url, value.titles)
+			addValueToNestedStrStrMap(passedTokenisedLinksAndTitleByDomainMap, key, value.url, value.titles)
 		}
 	}
 
@@ -763,11 +820,15 @@ func main() {
 	// compare maps for domain against previous enumerated list file with gzlop
 	// Print Alert - similiar to each row of .csv of urls
 
-	// Another kick in the really would like gzhobin data files
-	backupDataStorage()
-
+	err = backupDataStorage(app.historicDataFilePath)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
 	// Another kick the really would like gzhobin data files
-	updateDataStorage()
+	err = updateDataStorage(app.historicDataFilePath, passedTokenisedLinksAndTitleByDomainMap, failedTokenisedLinksAndTitleByDomainMap)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
 
 	// Output cli, file and (backup and then) organise historic data
 	err = selectOutput(outputArgs)
@@ -775,20 +836,6 @@ func main() {
 		checkError(err, 0, 0)
 	}
 
-}
-
-func defangUrl(inputUrl string) string {
-	tmpUrl := strings.ReplaceAll(inputUrl, "http", "hxxp")
-	tmpUrl = strings.ReplaceAll(tmpUrl, "://", "[://]")
-	outputUrl := strings.ReplaceAll(tmpUrl, ".", "[.]")
-	return outputUrl
-}
-
-func refangUrl(inputUrl string) string {
-	tmpUrl := strings.ReplaceAll(inputUrl, "hxxp", "http")
-	tmpUrl = strings.ReplaceAll(tmpUrl, "[]://]", "://")
-	outputUrl := strings.ReplaceAll(tmpUrl, "[.]", ".")
-	return outputUrl
 }
 
 // -

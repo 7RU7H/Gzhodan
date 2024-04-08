@@ -297,4 +297,12 @@ func wtfisthislackofsleepin2024() {
 	return nil
 
 }
+
+
+func refangUrl(inputUrl string) string {
+	tmpUrl := strings.ReplaceAll(inputUrl, "hxxp", "http")
+	tmpUrl = strings.ReplaceAll(tmpUrl, "[]://]", "://")
+	outputUrl := strings.ReplaceAll(tmpUrl, "[.]", ".")
+	return outputUrl
+}
 ```
