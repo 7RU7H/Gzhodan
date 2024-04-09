@@ -41,6 +41,7 @@ type Statistics struct {
 	date             time.Time
 	year             string
 	appStartTime     time.Time
+	totalFailedUrls  int
 }
 
 type CircularBuffer struct {
@@ -191,7 +192,7 @@ func (a *Application) handleArgs(args []string, argsLength int) error {
 	return nil
 }
 
-func (a *Application) selectOutput() error {
+func (a *Application) selectOutput(dut map[string]map[string]string, mtt map[string]*MatchOnTitles, failedCount int) error {
 	argsSize := len(a.outputType)
 	var argsId int = 0
 	switch argsSize {
@@ -233,17 +234,17 @@ func (a *Application) selectOutput() error {
 
 	switch argsId {
 	case 1: // verbose
-		verboseOutput(a)
+		verboseOutput(a, dut, mtt, failedCount)
 	case 2: // cli only
-		cliOnlyOutput(a)
+		cliOnlyOutput(a, dut, failedCount)
 	case 3: // verbose cli only
-		verboseCliOutput(a)
+		verboseCliOutput(a, dut, mtt, failedCount)
 	case 5: // markdown only
-		markdownOnlyOutput(a)
+		markdownOnlyOutput(a, dut, mtt, failedCount)
 	case 6: // verbose markdown
-		verboseMarkdownOutput(a)
+		verboseMarkdownOutput(a, dut, failedCount)
 	case 0:
-		defaultOutput(a)
+		defaultOutput(a, dut, failedCount)
 	default:
 		err := fmt.Errorf("invalid arg idenfier counted %v", argsId)
 		checkError(err, 0, 0)
@@ -385,7 +386,7 @@ func marshalURLsToMap() (map[string]string, map[string]int, error) {
 		urlStr = scanner.Text()
 		parsedURL, err := url.Parse(urlStr)
 		if err != nil {
-			fmt.Printf("Invalid URL: %s\n", urlStr)
+			io.WriteString(os.Stdout, fmt.Sprintf("Invalid URL: %s\n", urlStr))
 			continue
 		}
 
@@ -740,7 +741,6 @@ func main() {
 	}
 
 	failedLinksAndTitleByDomainMap := make(map[string]map[string]string)
-
 	// Make into a method!
 	// foundBaseLinks, foundHistoricLinks := make(map[string]map[string]string)
 	if app.historicDataFilePath != "" {
@@ -754,7 +754,8 @@ func main() {
 			}
 		}
 	} else {
-		foundBaseLinks := basePagesStdoutMap
+		// maps differ
+		foundBaseLinks = basePagesStdoutMap
 		WarningLogger.Printf("No historic data file provided to compare new url with previously enumerated data, this may take a lot longer!")
 	}
 
@@ -762,7 +763,7 @@ func main() {
 	if err != nil {
 		checkError(err, 0, 0)
 	}
-	workerCount, offset := 0, 0 // calcThreadsToOffsets(tokenArrayLen, other)
+	workerCount, offset := threadCount, 10 // calcThreadsToOffsets(tokenArrayLen, other)
 
 	TokensBuffer := newCircularBuffer(tokensArray, offset, workerCount)
 	workerOffsets, err := TokensBuffer.assignReadPointerOffsets()
@@ -817,63 +818,147 @@ func main() {
 		}
 	}
 
-	// TODO double check this jibberish:
-
-	// IS J'SON actually the way and is csv just bad or is google data broking fucking with me we design decision dilemia doubling
-	// ---- only need to store and compare urls
-	// if in the file remove from map
-	// Storage 2 files one .csv per run and collective with Page rating, time, url, matched tokens, And just previous-urls-found-only.list
-	// compare maps for domain against previous enumerated list file with gzlop
-	// Print Alert - similiar to each row of .csv of urls
-
 	err = backupDataStorage(app.historicDataFilePath)
 	if err != nil {
 		checkError(err, 0, 0)
 	}
-	// Another kick the really would like gzhobin data files
+
 	err = updateDataStorage(app.historicDataFilePath, passedTokenisedLinksAndTitleByDomainMap, failedTokenisedLinksAndTitleByDomainMap)
 	if err != nil {
 		checkError(err, 0, 0)
 	}
 
-	// Output cli, file and (backup and then) organise historic data
-	err = app.selectOutput()
+	app.statistics.totalFailedUrls = 0
+	for _, key := range failedLinksAndTitleByDomainMap {
+		app.statistics.totalFailedUrls = +len(key)
+	}
+	for _, key := range failedTokenisedLinksAndTitleByDomainMap {
+		app.statistics.totalFailedUrls = +len(key)
+	}
+
+	err = app.selectOutput(app, passedTokenisedLinksAndTitleByDomainMap, titleTokeniserResults, app.statistics.totalFailedUrls)
 	if err != nil {
 		checkError(err, 0, 0)
 	}
 
 }
 
-// -
-// -
-// OUTPUT TODO
-// -
-// -
-
-// verboseOutput - markdown + verbose markdown report, cli is verbose
-func verboseOutput(app *Application) {
-	verboseCliOutput(app)
-	verboseMarkdownOutput(app)
+func verboseOutput(app *Application, domainUrlTitles map[string]map[string]string, matchedTitles map[string]*MatchOnTitles, failedCount int) {
+	verboseCliOutput(app, domainUrlTitles, matchedTitles, failedCount)
+	verboseMarkdownOutput(app, domainUrlTitles, matchedTitles, failedCount)
 }
 
-func cliOnlyOutput(app *Application) {
-
-}
-
-func markdownOnlyOutput(app *Application) {
+func cliOnlyOutput(app *Application, domainUrlTitles map[string]map[string]string, failedCount int) {
+	successfulUrls := len(domainUrlTitles)
+	for key, _ := range domainUrlTitles {
+		for subKey, value := range domainUrlTitles[key] {
+			io.WriteString(os.Stdout, fmt.Sprintf("Found titled: \"%s\" at URL: %s\n", defangUrl(subKey), value))
+		}
+	}
+	io.WriteString(os.Stdout, fmt.Sprintf("Successful URLs found: %v\n", successfulUrls))
+	io.WriteString(os.Stdout, fmt.Sprintf("Failed URLs (As of previous runtime file: %v) refound: %v\n", app.historicDataFilePath, failedCount))
 
 }
 
-func verboseCliOutput(app *Application) {
+func lsCdTouchMarkdownFile(appDir string, date time.Time) (*os.File, error) {
+	err := os.Chdir("newsletters")
+	if err != nil {
+		checkError(err, 0, 0)
+		return nil, err
+	}
 
+	mdFilename := date.Format(time.DateOnly) + ".md"
+	exists, err := checkFileExists(mdFilename)
+	if exists {
+		err := fmt.Errorf("file with filename %v already exists", mdFilename)
+		checkError(err, 0, 0)
+		return nil, err
+	}
+	fout, err := os.Create(mdFilename)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+	return fout, nil
 }
 
-func verboseMarkdownOutput(app *Application) {
+func cdUpFromNewletters() error {
+	err := os.Chdir("../")
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+	return nil
+}
 
+func markdownOnlyOutput(app *Application, domainUrlTitles map[string]map[string]string, failedCount int) error {
+	file, err := lsCdTouchMarkdownFile(app.appDir, app.statistics.date)
+	if err != nil {
+		checkError(err, 0, 0)
+		return err
+	}
+	defer file.Close()
+	successfulUrls := len(domainUrlTitles)
+	for key, _ := range domainUrlTitles {
+		for subKey, value := range domainUrlTitles[key] {
+			io.WriteString(file, fmt.Sprintf("Found titled: \"%s\" at URL: %s\n", defangUrl(subKey), value))
+		}
+	}
+	io.WriteString(file, fmt.Sprintf("Successful URLs found: %v\n", successfulUrls))
+	io.WriteString(file, fmt.Sprintf("Failed URLs (As of previous runtime file: %v) refound: %v\n", app.historicDataFilePath, failedCount))
+
+	defer cdUpFromNewletters()
+	return nil
+}
+
+func verboseCliOutput(app *Application, domainUrlTitles map[string]map[string]string, matchedTitles map[string]*MatchOnTitles, failedCount int) error {
+	successfulUrls := len(domainUrlTitles)
+	for key, _ := range domainUrlTitles {
+		for subKey, value := range domainUrlTitles[key] {
+			io.WriteString(os.Stdout, fmt.Sprintf("Found titled: \"%s\" at URL: %s\n", defangUrl(subKey), value))
+			mot := matchedTitles[key]
+			io.WriteString(os.Stdout, fmt.Sprintf("Matched on %v Tokens: %v \n", mot.count, mot.tokens))
+		}
+	}
+	io.WriteString(os.Stdout, fmt.Sprintf("\t---- Statistics ----\n"))
+	io.WriteString(os.Stdout, fmt.Sprintf("Started: %v\n", app.statistics.appStartTime))
+	io.WriteString(os.Stdout, fmt.Sprintf("OS: %v\n", app.statistics.operatingSystem))
+	io.WriteString(os.Stdout, fmt.Sprintf("Total URLs visited %v\n", app.statistics.totalUrlsVisited))
+	io.WriteString(os.Stdout, fmt.Sprintf("Original Domains provided: %v\n", app.statistics.originalDomains))
+	io.WriteString(os.Stdout, fmt.Sprintf("Original URLs provided: %v\n", app.statistics.originalUrls))
+	io.WriteString(os.Stdout, fmt.Sprintf("Successful URLs found: %v\n", successfulUrls))
+	io.WriteString(os.Stdout, fmt.Sprintf("Failed URLs (As of previous runtime file: %v) refound: %v\n", app.historicDataFilePath, failedCount))
+	return nil
+}
+
+func verboseMarkdownOutput(app *Application, domainUrlTitles map[string]map[string]string, matchedTitles map[string]*MatchOnTitles, failedCount int) error {
+	file, err := lsCdTouchMarkdownFile(app.appDir, app.statistics.date)
+	if err != nil {
+		checkError(err, 0, 0)
+		return err
+	}
+	defer file.Close()
+	successfulUrls := len(domainUrlTitles)
+	for key, _ := range domainUrlTitles {
+		for subKey, value := range domainUrlTitles[key] {
+			io.WriteString(file, fmt.Sprintf("Found titled: \"%s\" at URL: %s\n", defangUrl(subKey), value))
+			mot := matchedTitles[key]
+			io.WriteString(file, fmt.Sprintf("Matched on %v Tokens: %v \n", mot.count, mot.tokens))
+		}
+	}
+	io.WriteString(file, fmt.Sprintf("\t---- Statistics ----\n"))
+	io.WriteString(file, fmt.Sprintf("Started: %v\n", app.statistics.appStartTime))
+	io.WriteString(file, fmt.Sprintf("OS: %v\n", app.statistics.operatingSystem))
+	io.WriteString(file, fmt.Sprintf("Total URLs visited %v\n", app.statistics.totalUrlsVisited))
+	io.WriteString(file, fmt.Sprintf("Original Domains provided: %v\n", app.statistics.originalDomains))
+	io.WriteString(file, fmt.Sprintf("Original URLs provided: %v\n", app.statistics.originalUrls))
+	io.WriteString(file, fmt.Sprintf("Successful URLs found: %v\n", successfulUrls))
+	io.WriteString(file, fmt.Sprintf("Failed URLs (As of previous runtime file: %v) refound: %v\n", app.historicDataFilePath, failedCount))
+
+	defer cdUpFromNewletters()
+	return nil
 }
 
 // defaultOutput - cli some app.statistics.stics and markdown report
-func defaultOutput(app *Application) {
-	cliOnlyOutput(app)
-	markdownOnlyOutput(app)
+func defaultOutput(app *Application, domainUrlTitles map[string]map[string]string, failedCount int) {
+	cliOnlyOutput(app, domainUrlTitles, failedCount)
+	markdownOnlyOutput(app, domainUrlTitles, failedCount)
 }
