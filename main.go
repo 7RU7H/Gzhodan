@@ -50,6 +50,24 @@ type CircularBuffer struct {
 	readPointers []int
 }
 
+func newCircularBuffer(data []byte, concurrencyOffset, workers int) *CircularBuffer {
+	return &CircularBuffer{
+		buffer:       data,
+		size:         len(data) - 1,
+		readPointers: make([]int, concurrencyOffset*workers),
+	}
+}
+
+func (c *CircularBuffer) readCircularBufferFromOffset(worker int) (data byte) {
+	data = c.buffer[c.readPointers[worker]]
+	c.readPointers[worker] = (c.readPointers[worker] + 1) % c.size
+	return data
+}
+
+func (b *CircularBuffer) assignReadPointerOffsets(concurrencyOffset int) {
+
+}
+
 type MatchOnTitles struct {
 	url    string
 	titles string
@@ -77,20 +95,6 @@ func (m *MatchOnTitles) Build() MatchOnTitles {
 		tokens: make([]string, 0),
 		count:  0,
 	}
-}
-
-func newCircularBuffer(data []byte, concurrencyOffset, workers int) *CircularBuffer {
-	return &CircularBuffer{
-		buffer:       data,
-		size:         len(data) - 1,
-		readPointers: make([]int, concurrencyOffset*workers),
-	}
-}
-
-func (c *CircularBuffer) readCircularBufferFromOffset(worker int) (data byte) {
-	data = c.buffer[c.readPointers[worker]]
-	c.readPointers[worker] = (c.readPointers[worker] + 1) % c.size
-	return data
 }
 
 var (
@@ -240,9 +244,9 @@ func (a *Application) selectOutput(dut map[string]map[string]string, mtt map[str
 	case 3: // verbose cli only
 		verboseCliOutput(a, dut, mtt, failedCount)
 	case 5: // markdown only
-		markdownOnlyOutput(a, dut, mtt, failedCount)
+		markdownOnlyOutput(a, dut, failedCount)
 	case 6: // verbose markdown
-		verboseMarkdownOutput(a, dut, failedCount)
+		verboseMarkdownOutput(a, dut, mtt, failedCount)
 	case 0:
 		defaultOutput(a, dut, failedCount)
 	default:
@@ -763,9 +767,9 @@ func main() {
 	if err != nil {
 		checkError(err, 0, 0)
 	}
-	workerCount, offset := threadCount, 10 // calcThreadsToOffsets(tokenArrayLen, other)
+	workerCount, concCurrOffset := threadCount, 10 // calcConcurrencyOffsets(threadCount)
 
-	TokensBuffer := newCircularBuffer(tokensArray, offset, workerCount)
+	TokensBuffer := newCircularBuffer(tokensArray, concCurrOffset, workerCount)
 	workerOffsets, err := TokensBuffer.assignReadPointerOffsets()
 	if err != nil {
 		checkError(err, 0, 0)
