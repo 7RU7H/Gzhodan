@@ -64,8 +64,18 @@ func (c *CircularBuffer) readCircularBufferFromOffset(worker int) (data byte) {
 	return data
 }
 
-func (b *CircularBuffer) assignReadPointerOffsets(concurrencyOffset int) {
-
+// Simple idiot solution
+func (b *CircularBuffer) assignReadPointerOffsets(concurrencyOffset, remainder int) {
+	if remainder != 0 {
+		for i := 1; i <= len(b.readPointers); i += concurrencyOffset {
+			b.readPointers[i] = (concurrencyOffset * i) + remainder
+			remainder--
+		}
+	} else {
+		for i := 1; i <= len(b.readPointers); i += concurrencyOffset {
+			b.readPointers[i] = concurrencyOffset * i
+		}
+	}
 }
 
 type MatchOnTitles struct {
@@ -102,6 +112,23 @@ var (
 	InfoLogger    *log.Logger
 	ErrorLogger   *log.Logger
 )
+
+func (a *Application) CreateWorkingDir() error {
+	err := mkDirAndCD(a.appDir)
+	if err != nil {
+		checkError(err, 0, 0)
+		return err
+	}
+
+	dirTree := []string{"test", "logs", "newletters", a.statistics.year}
+	err = mkAppDirTree(a.appDir, dirTree)
+	if err != nil {
+		checkError(err, 0, 0)
+		return err
+	}
+	a.testDir = filepath.Join(a.appDir, "test")
+	return nil
+}
 
 // https://gobyexample.com/reading-files
 func (a *Application) loadTokensIntoMem() ([]byte, int, error) {
@@ -682,11 +709,6 @@ func main() {
 		checkError(err, 0, 0)
 	}
 
-	// Everything below could be in its own method
-	//
-	// Later functionality when there is alot data at some point we need condensing or checking
-	// to or with a historicData file, these kind of programs need data regression to best dataset (size, quality, parsability,etc)
-	// Do not remove
 	err = app.checkPrevRuntimes()
 	if err != nil {
 		checkError(err, 0, 0)
@@ -698,17 +720,10 @@ func main() {
 	}
 	InfoLogger.Printf("Logging initialised")
 
-	err = mkDirAndCD(app.appDir)
+	err = app.CreateWorkingDir()
 	if err != nil {
 		checkError(err, 0, 0)
 	}
-
-	dirTree := []string{"test", "logs", "newletters", app.statistics.year}
-	err = mkAppDirTree(app.appDir, dirTree)
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-	app.testDir = filepath.Join(app.appDir, "test")
 
 	urlsToVisit, baseDNSurlTotals, err := marshalURLsToMap()
 	if err != nil {
@@ -728,7 +743,6 @@ func main() {
 
 	app.statistics.originalUrls = totalUrls
 	app.statistics.totalUrlsVisited += totalUrls
-	// Everything above could be in its own method
 
 	// Consider implecations of full implecation at some point...
 	var defaultThreadCount int = 10
@@ -746,8 +760,9 @@ func main() {
 
 	failedLinksAndTitleByDomainMap := make(map[string]map[string]string)
 	// Make into a method!
-	// foundBaseLinks, foundHistoricLinks := make(map[string]map[string]string)
+	foundBaseLinks := make(map[string]map[string]string)
 	if app.historicDataFilePath != "" {
+		foundHistoricLinks := make(map[string]map[string]string)
 		foundBaseLinks, foundHistoricLinks, err := app.compareUrlsHistorically(artefactsFromBasePages)
 		if err != nil {
 			checkError(err, 0, 0)
@@ -758,7 +773,7 @@ func main() {
 			}
 		}
 	} else {
-		// maps differ
+		// maps differ !!!!
 		foundBaseLinks = basePagesStdoutMap
 		WarningLogger.Printf("No historic data file provided to compare new url with previously enumerated data, this may take a lot longer!")
 	}
@@ -767,16 +782,34 @@ func main() {
 	if err != nil {
 		checkError(err, 0, 0)
 	}
-	workerCount, concCurrOffset := threadCount, 10 // calcConcurrencyOffsets(threadCount)
+
+	// DOUBLE CHECK!!
+	workerCount := threadCount
+	totalTokens := tokensArrayLen - 1
+	remainder := totalTokens % workerCount
+	concCurrOffset := 0
+	if workerCount <= totalTokens {
+		if workerCount > (totalTokens / 2) {
+			concCurrOffset = totalTokens / workerCount
+		}
+	} else {
+		workerCount = totalTokens
+		concCurrOffset = 1
+		remainder = 0
+	}
 
 	TokensBuffer := newCircularBuffer(tokensArray, concCurrOffset, workerCount)
-	workerOffsets, err := TokensBuffer.assignReadPointerOffsets()
+	TokensBuffer.assignReadPointerOffsets(concCurrOffset, remainder)
 	if err != nil {
 		checkError(err, 0, 0)
 	}
 
 	titleTokeniserResults := make(map[string]*MatchesOnTitles)
 	motBuilder := newMatchOnTitlesBuilder()
+
+	workerId := 0 // Work-around pre Paralellism
+	// mutex foundBaseLinks
+	// go func (workerId int, foundBaseLinks map[string]map[string]string) {
 	for key, _ := range foundBaseLinks {
 		for subKey, value := range foundBaseLinks[key] {
 			var buffer bytes.Buffer
@@ -789,7 +822,7 @@ func main() {
 			for i, matchesFound := 0, 0; i <= tokensArrayLen-1; i++ {
 				if matchThreshold != matchesFound {
 					for j := 0; j <= len(titlesAsBytes)-1; j++ {
-						buffer.WriteByte(TokensBuffer.readCircularBufferFromOffset(workerOffsets[0]))
+						buffer.WriteByte(TokensBuffer.readCircularBufferFromOffset(workerId))
 						token := buffer.Bytes()
 						match := bytes.Compare(titlesAsBytes[j], token)
 						if match != 0 {
