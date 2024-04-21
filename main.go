@@ -132,7 +132,6 @@ func (a *Application) CreateWorkingDir() error {
 
 func (app *Application) processCurrAndHistoricData(artefactsFromBasePages map[string]string) (foundBaseLinksAndTitles, failedLinksAndTitleByDomainMap map[string]map[string]string, err error) {
 	if app.historicDataFilePath != "" {
-		foundHistoricLinks := make(map[string]map[string]string)
 		foundBaseLinksAndTitles, foundHistoricLinks, err := app.compareUrlsHistorically(artefactsFromBasePages)
 		if err != nil {
 			checkError(err, 0, 0)
@@ -346,7 +345,7 @@ func (a *Application) compareUrlsHistorically(urlsFound map[string]string) (map[
 	allTitles := make(map[int]string)
 	i := 0
 	for urlKey, titleValue := range urlsFound {
-		allUrlsAsBytes = append([]byte(urlKey))
+		allUrlsAsBytes = strconv.AppendQuote(allUrlsAsBytes, urlKey)
 		allTitles[i] = titleValue
 		i++
 	}
@@ -382,7 +381,7 @@ func (a *Application) compareUrlsHistorically(urlsFound map[string]string) (map[
 func urlKeyToDomainString(keyUrl string) (string, error) {
 	parsedURL, err := url.Parse(keyUrl)
 	if err != nil {
-		fmt.Errorf("invalid url: %s\n", keyUrl)
+		err := fmt.Errorf("invalid url: %s", keyUrl)
 		checkError(err, 0, 0)
 	}
 	return parsedURL.Hostname(), nil
@@ -593,6 +592,7 @@ func gzlopBuffer(buffer *bytes.Buffer, patterns []byte) (map[int]string, error) 
 	}
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		checkError(err, 0, 0)
 	}
 	return artifacts, nil
 }
@@ -622,7 +622,7 @@ func parseAllBasePagesForLinksAndTitles(basePagesStdoutMap map[string]string) (m
 				checkError(err, 0, 0)
 			}
 			if match {
-				basePageAllHrefs = append([]string{line})
+				basePageAllHrefs = append(basePageAllHrefs, line)
 			}
 		}
 		for _, hrefPathAndTitle := range basePageAllHrefs {
@@ -674,6 +674,10 @@ func backupDataStorage(src string) error {
 	fin, err := os.Open(src)
 	if err != nil {
 		checkError(err, 0, 0)
+		err = createFile(src)
+		checkError(err, 0, 0)
+		fin, err = os.Open(src)
+		checkError(err, 0, 0)
 	}
 	defer fin.Close()
 
@@ -717,7 +721,8 @@ func lsCdTouchMarkdownFile(appDir string, date time.Time) (*os.File, error) {
 
 	mdFilename := date.Format(time.DateOnly) + ".md"
 	exists, err := checkFileExists(mdFilename)
-	if exists {
+	checkError(err, 0, 0)
+	if !exists {
 		err := fmt.Errorf("file with filename %v already exists", mdFilename)
 		checkError(err, 0, 0)
 		return nil, err
@@ -940,12 +945,13 @@ func main() {
 	titleTokeniserResults := make(map[string]*MatchOnTitles)
 	motBuilder := newMatchOnTitlesBuilder()
 
+	// TEST with gzlopBuffer for which is faster
 	workerId := 0 // Work-around pre Paralellism
 	// mutex foundBaseLinks
 	// go func (workerId int, foundBaseLinks map[string]map[string]string) {
 	for key, _ := range foundBaseLinksAndTitles {
 		for subKey, value := range foundBaseLinksAndTitles[key] {
-			var buffer bytes.Buffer
+			var bufferTokens, bufferTitles bytes.Buffer
 			domUrlMoT := motBuilder.
 				Url(subKey).
 				Titles(value).
@@ -955,16 +961,19 @@ func main() {
 			for h := 0; h <= len(valueAsSlice)-1; h++ {
 				titlesAsBytes = append([]byte(valueAsSlice[h]))
 			}
-			matchThreshold := 5
-			for i, matchesFound := 0, 0; i <= tokensArrayLen-1; i++ {
+
+			var matchesFound, matchThreshold uint = 0, 5
+			for i := 0; i <= tokensArrayLen-1; i++ {
 				if matchThreshold != matchesFound {
 					for j := 0; j <= len(titlesAsBytes)-1; j++ {
-						buffer.WriteByte(TokensBuffer.readCircularBufferFromOffset(workerId))
-						token := buffer.Bytes()
-						match := bytes.Compare([]byte(bytetitlesAsBytes[j]), token)
+						bufferTokens.WriteByte(TokensBuffer.readCircularBufferFromOffset(workerId))
+						bufferTitles.WriteByte(titlesAsBytes[j])
+						tokenInBuf := bufferTokens.Bytes()
+						titleWordInBuf := bufferTitles.Bytes()
+						match := bytes.Compare(titleWordInBuf, tokenInBuf)
 						if match != 0 {
-							domUrlMoT.tokens = append(domUrlMoT.tokens, buffer.String())
-							matchesFound = +match
+							domUrlMoT.tokens = append(domUrlMoT.tokens, bufferTokens.String())
+							matchesFound++
 						}
 					}
 				} else {
@@ -972,7 +981,7 @@ func main() {
 					break
 				}
 			}
-			titleTokeniserResults[key] = domUrlMoT
+			titleTokeniserResults[key] = &domUrlMoT
 		}
 	}
 	// }()
@@ -990,6 +999,13 @@ func main() {
 			delete(titleTokeniserResults, key)
 		default:
 			addValueToNestedStrStrMap(passedTokenisedLinksAndTitleByDomainMap, key, value.url, value.titles)
+		}
+	}
+
+	for key, _ := range passedTokenisedLinksAndTitleByDomainMap {
+		for urlSubKey, _ := range passedTokenisedLinksAndTitleByDomainMap[key] {
+			InfoLogger.Printf("Attempting to curl: %s\n", urlSubKey)
+			curlNewArticles(strings.SplitAfterN(urlSubKey, "", -1))
 		}
 	}
 
