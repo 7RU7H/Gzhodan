@@ -29,8 +29,8 @@ type Application struct {
 	multiDaily           bool
 	outputType           string
 	gzhodanConfig        string
-	optionalConfigs      map[string]string
-	tokensFile           string
+	// optionalConfigs      map[string]string // ASP
+	tokensFile string
 }
 
 type Statistics struct {
@@ -137,7 +137,7 @@ func (app *Application) processCurrAndHistoricData(artefactsFromBasePages map[st
 			checkError(err, 0, 0)
 			return nil, nil, err
 		}
-		for key, _ := range foundHistoricLinks {
+		for key := range foundHistoricLinks {
 			for subKey, value := range foundHistoricLinks[key] {
 				addValueToNestedStrStrMap(failedLinksAndTitleByDomainMap, key, subKey, value)
 			}
@@ -494,6 +494,7 @@ func (a *Application) checkPrevRuntimes() error {
 
 	currDateStr := time.Time.String(a.statistics.date)
 	compare, err := time.Parse(time.DateOnly, "2006-03-03")
+	checkError(err, 0, 0)
 	for _, dir := range dirListing {
 		tmp, err := time.Parse(time.DateOnly, dir.Name())
 		if err != nil {
@@ -650,16 +651,16 @@ func updateDataStorage(file string, passed map[string]map[string]string, failed 
 		checkError(err, 0, 0)
 	}
 	defer f.Close()
-	for key, _ := range passed {
-		for subKey, _ := range passed[key] {
+	for key := range passed {
+		for subKey := range passed[key] {
 			_, err := f.WriteString(subKey + "\n")
 			if err != nil {
 				checkError(err, 0, 0)
 			}
 		}
 	}
-	for key, _ := range failed {
-		for subKey, _ := range failed[key] {
+	for key := range failed {
+		for subKey := range failed[key] {
 			_, err := f.WriteString(subKey + "\n")
 			if err != nil {
 				checkError(err, 0, 0)
@@ -702,7 +703,7 @@ func verboseOutput(app *Application, domainUrlTitles map[string]map[string]strin
 
 func cliOnlyOutput(app *Application, domainUrlTitles map[string]map[string]string, failedCount int) {
 	successfulUrls := len(domainUrlTitles)
-	for key, _ := range domainUrlTitles {
+	for key := range domainUrlTitles {
 		for subKey, value := range domainUrlTitles[key] {
 			io.WriteString(os.Stdout, fmt.Sprintf("Found titled: \"%s\" at URL: %s\n", defangUrl(subKey), value))
 		}
@@ -713,7 +714,14 @@ func cliOnlyOutput(app *Application, domainUrlTitles map[string]map[string]strin
 }
 
 func lsCdTouchMarkdownFile(appDir string, date time.Time) (*os.File, error) {
-	err := os.Chdir("newsletters")
+	currDir, err := os.Getwd()
+	checkError(err, 0, 0)
+	if currDir != appDir {
+		err := fmt.Errorf("current directory %v is not application specified directory: %v for some weird reason - must debug", currDir, appDir)
+		checkError(err, 0, 0)
+		return nil, err
+	}
+	err = os.Chdir("newsletters")
 	if err != nil {
 		checkError(err, 0, 0)
 		return nil, err
@@ -750,7 +758,7 @@ func markdownOnlyOutput(app *Application, domainUrlTitles map[string]map[string]
 	}
 	defer file.Close()
 	successfulUrls := len(domainUrlTitles)
-	for key, _ := range domainUrlTitles {
+	for key := range domainUrlTitles {
 		for subKey, value := range domainUrlTitles[key] {
 			io.WriteString(file, fmt.Sprintf("Found titled: \"%s\" at URL: %s\n", defangUrl(subKey), value))
 		}
@@ -764,14 +772,14 @@ func markdownOnlyOutput(app *Application, domainUrlTitles map[string]map[string]
 
 func verboseCliOutput(app *Application, domainUrlTitles map[string]map[string]string, matchedTitles map[string]*MatchOnTitles, failedCount int) error {
 	successfulUrls := len(domainUrlTitles)
-	for key, _ := range domainUrlTitles {
+	for key := range domainUrlTitles {
 		for subKey, value := range domainUrlTitles[key] {
 			io.WriteString(os.Stdout, fmt.Sprintf("Found titled: \"%s\" at URL: %s\n", defangUrl(subKey), value))
 			mot := matchedTitles[key]
 			io.WriteString(os.Stdout, fmt.Sprintf("Matched on %v Tokens: %v \n", mot.count, mot.tokens))
 		}
 	}
-	io.WriteString(os.Stdout, fmt.Sprintf("\t---- Statistics ----\n"))
+	io.WriteString(os.Stdout, fmt.Sprintf("\t---- Statistics - %v ----\n", app.statistics.date.String()))
 	io.WriteString(os.Stdout, fmt.Sprintf("Started: %v\n", app.statistics.appStartTime))
 	io.WriteString(os.Stdout, fmt.Sprintf("OS: %v\n", app.statistics.operatingSystem))
 	io.WriteString(os.Stdout, fmt.Sprintf("Total URLs visited %v\n", app.statistics.totalUrlsVisited))
@@ -790,14 +798,14 @@ func verboseMarkdownOutput(app *Application, domainUrlTitles map[string]map[stri
 	}
 	defer file.Close()
 	successfulUrls := len(domainUrlTitles)
-	for key, _ := range domainUrlTitles {
+	for key := range domainUrlTitles {
 		for subKey, value := range domainUrlTitles[key] {
 			io.WriteString(file, fmt.Sprintf("Found titled: \"%s\" at URL: %s\n", defangUrl(subKey), value))
 			mot := matchedTitles[key]
 			io.WriteString(file, fmt.Sprintf("Matched on %v Tokens: %v \n", mot.count, mot.tokens))
 		}
 	}
-	io.WriteString(file, fmt.Sprintf("\t---- Statistics ----\n"))
+	io.WriteString(file, fmt.Sprintf("\t---- Statistics - %v ----\n", app.statistics.date.String()))
 	io.WriteString(file, fmt.Sprintf("Started: %v\n", app.statistics.appStartTime))
 	io.WriteString(file, fmt.Sprintf("OS: %v\n", app.statistics.operatingSystem))
 	io.WriteString(file, fmt.Sprintf("Total URLs visited %v\n", app.statistics.totalUrlsVisited))
@@ -885,7 +893,7 @@ func main() {
 	}
 	allBaseUrlsSeq := make([]string, 0, len(urlsToVisit))
 	for _, value := range urlsToVisit {
-		allBaseUrlsSeq = append(strings.Split(value, ""))
+		allBaseUrlsSeq = append(allBaseUrlsSeq, value)
 	}
 
 	totalUrls := 0
@@ -912,9 +920,11 @@ func main() {
 		checkError(err, 0, 0)
 	}
 
-	failedLinksAndTitleByDomainMap := make(map[string]map[string]string)
-	foundBaseLinksAndTitles := make(map[string]map[string]string)
-	foundBaseLinksAndTitles, failedLinksAndTitleByDomainMap, err = app.processCurrAndHistoricData(artefactsFromBasePages)
+	// map[string]map[string]string
+	foundBaseLinksAndTitles, failedLinksAndTitleByDomainMap, err := app.processCurrAndHistoricData(artefactsFromBasePages)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
 
 	tokensArray, tokensArrayLen, err := app.loadTokensIntoMem()
 	if err != nil {
@@ -949,7 +959,7 @@ func main() {
 	workerId := 0 // Work-around pre Paralellism
 	// mutex foundBaseLinks
 	// go func (workerId int, foundBaseLinks map[string]map[string]string) {
-	for key, _ := range foundBaseLinksAndTitles {
+	for key := range foundBaseLinksAndTitles {
 		for subKey, value := range foundBaseLinksAndTitles[key] {
 			var bufferTokens, bufferTitles bytes.Buffer
 			domUrlMoT := motBuilder.
@@ -959,7 +969,7 @@ func main() {
 			valueAsSlice := strings.SplitAfterN(value, " ", -1)
 			titlesAsBytes := make([]byte, 0)
 			for h := 0; h <= len(valueAsSlice)-1; h++ {
-				titlesAsBytes = append([]byte(valueAsSlice[h]))
+				titlesAsBytes = strconv.AppendQuote(titlesAsBytes, valueAsSlice[h])
 			}
 
 			var matchesFound, matchThreshold uint = 0, 5
@@ -1002,8 +1012,8 @@ func main() {
 		}
 	}
 
-	for key, _ := range passedTokenisedLinksAndTitleByDomainMap {
-		for urlSubKey, _ := range passedTokenisedLinksAndTitleByDomainMap[key] {
+	for key := range passedTokenisedLinksAndTitleByDomainMap {
+		for urlSubKey := range passedTokenisedLinksAndTitleByDomainMap[key] {
 			InfoLogger.Printf("Attempting to curl: %s\n", urlSubKey)
 			curlNewArticles(strings.SplitAfterN(urlSubKey, "", -1))
 		}
