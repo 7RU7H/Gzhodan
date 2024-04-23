@@ -173,12 +173,41 @@ func (a *Application) loadTokensIntoMem() ([]byte, int, error) {
 	return tokensFileAsBytes, bsLen, nil
 }
 
+func mvToAppDir(appDir string) (bool, error) {
+	var result bool = false
+	err := os.Chdir(appDir)
+	if err != nil {
+		checkError(err, 0, 0)
+		return result, err
+	}
+	result = true
+	return result, nil
+}
+
 func (a *Application) handleArgs(args []string, argsLength int) error {
 	for i := 0; i <= argsLength-1; i++ {
 		switch args[i] {
 		case "-o":
-			// Check Directory exist function required
+			appDirExists, err := checkFileExists(args[i+1])
+			if err != nil || !appDirExists {
+				checkError(err, 0, 0)
+				WarningLogger.Printf("No historic data file provided to compare new url with previously enumerated data, this may take a lot longer!")
+			} else {
+				a.historicDataFilePath = args[i+1]
+			}
 			a.appDir = args[i+1]
+			mvStat, err := mvToAppDir(args[i+1])
+			if err != nil || !mvStat {
+				checkError(err, 0, 0)
+				WarningLogger.Printf("unable to move to the specified application directory: %s", args[i+1])
+			} else {
+				wd, err := os.Getwd()
+				if err != nil || wd == "" {
+					checkError(err, 0, 0)
+					continue
+				}
+				InfoLogger.Printf("current application directory changed to %s", wd)
+			}
 		case "-m":
 			a.multiDaily = true
 		case "-H":
@@ -537,23 +566,6 @@ func mkAppDirTree(appDir string, dirTree []string) error {
 	return nil
 }
 
-func trimFilePath(path string) (result string, err error) {
-	os := runtime.GOOS
-	switch os {
-	case "windows":
-		pathSlice := strings.SplitAfterN(path, "\\", -1)
-		result = pathSlice[len(pathSlice)-1]
-	case "linux":
-		pathSlice := strings.SplitAfterN(path, "/", -1)
-		result = pathSlice[len(pathSlice)-1]
-	default:
-		err := fmt.Errorf("unsupported os for filepath trimming of delimited %s", os)
-		checkError(err, 0, 0)
-		return "", err
-	}
-	return result, err
-}
-
 func curlNewBasePages(urlArr []string) (map[string]string, error) {
 	var args string = "-K curlrc -L "
 	result := make(map[string]string)
@@ -606,6 +618,15 @@ func addValueToNestedStrStrMap(parentMap map[string]map[string]string, parentKey
 	childMap := parentMap[parentKey]
 	if childMap == nil {
 		childMap = make(map[string]string)
+		parentMap[parentKey] = childMap
+	}
+	childMap[childKey] = nestedValue
+}
+
+func addValueToNestedStrIntStrMap(parentMap map[string]map[int]string, parentKey string, childKey int, nestedValue string) {
+	childMap := parentMap[parentKey]
+	if childMap == nil {
+		childMap = make(map[int]string)
 		parentMap[parentKey] = childMap
 	}
 	childMap[childKey] = nestedValue
@@ -837,6 +858,8 @@ func main() {
 	flag.StringVar(&verboseOutput, "V", "", "Verbose output is combinable with -C or -M")
 	flag.Parse()
 
+	var gzlopTestBoolean bool = false
+
 	args, argsLen := os.Args, len(os.Args)
 	if argsLen > 2 {
 		flag.PrintDefaults()
@@ -944,6 +967,26 @@ func main() {
 		workerCount = totalTokens
 		concCurrOffset = 1
 		remainder = 0
+	}
+
+	gzlopTestMap := make(map[string]map[int]string)
+	if gzlopTestBoolean {
+		for key := range foundBaseLinksAndTitles {
+			for subKey, value := range foundBaseLinksAndTitles[key] {
+				titlesAsBytes := make([]byte, 0)
+				valueAsSlice := strings.SplitAfterN(value, " ", -1)
+				for i := 0; i <= len(value)-1; i++ {
+					titlesAsBytes = strconv.AppendQuote(titlesAsBytes, valueAsSlice[i])
+				}
+				result, err := gzlopBuffer(bytes.NewBuffer(titlesAsBytes), tokensArray)
+				if err != nil {
+					checkError(err, 0, 0)
+				}
+				for resultsKey, resultsVal := range result {
+					addValueToNestedStrIntStrMap(gzlopTestMap, subKey, resultsKey, resultsVal)
+				}
+			}
+		}
 	}
 
 	TokensBuffer := newCircularBuffer(tokensArray, concCurrOffset, workerCount)
