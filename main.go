@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -29,8 +30,8 @@ type Application struct {
 	multiDaily           bool
 	outputType           string
 	gzhodanConfig        string
-	// optionalConfigs      map[string]string // ASP
-	tokensFile string
+	optionalConfigs      map[string]string
+	tokensFile           string
 }
 
 type Statistics struct {
@@ -185,29 +186,37 @@ func mvToAppDir(appDir string) (bool, error) {
 }
 
 func (a *Application) handleArgs(args []string, argsLength int) error {
+	var checkPathsMatchArray []string
+	var tmpAppDir string
+	for h := 0; h <= argsLength-1; h++ {
+		if strings.Contains(args[h], "-o") {
+			tmpAppDir = args[h+1]
+		}
+	}
+	if tmpAppDir != "" {
+		appDirExists, err := checkDirExists(tmpAppDir)
+		if err != nil || !appDirExists {
+			checkError(err, 0, 0)
+			WarningLogger.Printf("No historic data file provided to compare new url with previously enumerated data, this may take a lot longer!")
+		} else {
+			a.appDir = tmpAppDir
+		}
+		a.appDir = tmpAppDir
+		mvStat, err := mvToAppDir(tmpAppDir)
+		if err != nil || !mvStat {
+			checkError(err, 0, 0)
+			WarningLogger.Printf("unable to move to the specified application directory: %s", tmpAppDir)
+		} else {
+			wd, err := os.Getwd()
+			if err != nil || wd == "" {
+				checkError(err, 0, 0)
+			}
+			InfoLogger.Printf("current application directory changed to %s", wd)
+		}
+	}
+
 	for i := 0; i <= argsLength-1; i++ {
 		switch args[i] {
-		case "-o":
-			appDirExists, err := checkFileExists(args[i+1])
-			if err != nil || !appDirExists {
-				checkError(err, 0, 0)
-				WarningLogger.Printf("No historic data file provided to compare new url with previously enumerated data, this may take a lot longer!")
-			} else {
-				a.historicDataFilePath = args[i+1]
-			}
-			a.appDir = args[i+1]
-			mvStat, err := mvToAppDir(args[i+1])
-			if err != nil || !mvStat {
-				checkError(err, 0, 0)
-				WarningLogger.Printf("unable to move to the specified application directory: %s", args[i+1])
-			} else {
-				wd, err := os.Getwd()
-				if err != nil || wd == "" {
-					checkError(err, 0, 0)
-					continue
-				}
-				InfoLogger.Printf("current application directory changed to %s", wd)
-			}
 		case "-m":
 			a.multiDaily = true
 		case "-H":
@@ -217,27 +226,34 @@ func (a *Application) handleArgs(args []string, argsLength int) error {
 				WarningLogger.Printf("No historic data file provided to compare new url with previously enumerated data, this may take a lot longer!")
 			} else {
 				a.historicDataFilePath = args[i+1]
+				checkPathsMatchArray = append(checkPathsMatchArray, args[i+1])
 			}
 		case "-O":
 			configListSlice := strings.SplitAfterN(args[i+1], ",", -1)
-			tmpmap := make(map[string]string)
 			for _, config := range configListSlice {
-				var key string
-				if strings.Contains(config, "/") {
-					keySlice := strings.SplitAfterN(config, "/", -1)
-					key = keySlice[len(keySlice)-1]
-				}
-				if strings.Contains(config, "\\") {
-					keySlice := strings.SplitAfterN(config, "\\", -1)
-					key = keySlice[len(keySlice)-1]
-				}
-				keySlice := strings.Split(key, ".")
-				key = keySlice[0]
 				exists, err := checkFileExists(config)
 				if err != nil || !exists {
 					checkError(err, 0, 0)
+					continue
 				}
-				tmpmap[key] = config
+				var key string
+				if strings.Contains(config, "/") {
+					checkPathsMatchArray = append(checkPathsMatchArray, config)
+					keySlice := strings.SplitAfterN(config, "/", -1)
+					key = keySlice[len(keySlice)-1]
+				} else if strings.Contains(config, "\\") {
+					checkPathsMatchArray = append(checkPathsMatchArray, config)
+					keySlice := strings.SplitAfterN(config, "\\", -1)
+					key = keySlice[len(keySlice)-1]
+				} else {
+					pathDir := path.Dir(config)
+					if !strings.Contains(pathDir, a.appDir) {
+						checkPathsMatchArray = append(checkPathsMatchArray, config)
+					}
+				}
+				keySlice := strings.Split(key, ".")
+				key = keySlice[0]
+				a.optionalConfigs[key] = config
 			}
 		case "-t":
 			exists, err := checkFileExists(args[i+1])
@@ -277,7 +293,45 @@ func (a *Application) handleArgs(args []string, argsLength int) error {
 		}
 	}
 
+	for _, path := range checkPathsMatchArray {
+		a.copyFilesToAppDir(path)
+	}
+
 	return nil
+}
+
+func (a *Application) copyFilesToAppDir(src string) error {
+	fin, err := os.Open(src)
+	if err != nil {
+		checkError(err, 0, 0)
+		return err
+	}
+	defer fin.Close()
+	var dst string = ""
+	OS := runtime.GOOS
+	switch OS {
+	case "windows":
+		dst = a.appDir + "\\" + fin.Name()
+	case "linux":
+		dst = a.appDir + "/" + fin.Name()
+	default:
+		err := fmt.Errorf("unsupported os for filepath trimming of delimited %s", OS)
+		checkError(err, 0, 0)
+		return err
+	}
+
+	fout, err := os.Create(dst)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+	defer fout.Close()
+
+	_, err = io.Copy(fout, fin)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+	return nil
+
 }
 
 func (a *Application) selectOutput(dut map[string]map[string]string, mtt map[string]*MatchOnTitles, failedCount int) error {
@@ -424,6 +478,14 @@ func createFile(filepath string) error {
 	}
 	defer filePtr.Close()
 	return nil
+}
+
+func checkDirExists(dir string) (bool, error) {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		checkError(err, 0, 0)
+		return false, err
+	}
+	return true, nil
 }
 
 func checkFileExists(path string) (bool, error) {
