@@ -51,6 +51,14 @@ type CircularBuffer struct {
 	readPointers []int
 }
 
+type MatchOnTitles struct {
+	url    string
+	titles string
+	tokens []string
+	count  uint
+}
+
+// CircularBuffer Methods Start
 func newCircularBuffer(data []byte, concurrencyOffset, workers int) *CircularBuffer {
 	return &CircularBuffer{
 		buffer:       data,
@@ -79,13 +87,9 @@ func (b *CircularBuffer) assignReadPointerOffsets(concurrencyOffset, remainder i
 	}
 }
 
-type MatchOnTitles struct {
-	url    string
-	titles string
-	tokens []string
-	count  uint
-}
+// CircularBuffer Methods End
 
+// MatchOnTitles Methods Start
 func newMatchOnTitlesBuilder() *MatchOnTitles {
 	return &MatchOnTitles{}
 }
@@ -108,12 +112,33 @@ func (m *MatchOnTitles) Build() MatchOnTitles {
 	}
 }
 
+// MatchOnTitles Methods End
+
 var (
 	WarningLogger *log.Logger
 	InfoLogger    *log.Logger
 	ErrorLogger   *log.Logger
 )
 
+// InfoLogger.Printf("Something noteworthy happened\n")
+// WarningLogger.Printf("There is something you should know about\n")
+// ErrorLogger.Printf("Something went wrong\n")
+func initaliseLogging() error {
+	now := time.Now().UTC()
+	dateFormatted := now.Format("2006-01-01")
+	nameBuilder := strings.Builder{}
+	nameBuilder.WriteString(dateFormatted)
+	nameBuilder.WriteString(".log")
+	file, err := os.OpenFile(nameBuilder.String(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0661)
+	checkError(err, 0, 0)
+
+	InfoLogger = log.New(file, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	WarningLogger = log.New(file, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
+	ErrorLogger = log.New(file, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+	return nil
+}
+
+// Application Method Start
 func (a *Application) CreateWorkingDir() error {
 	err := mkDirAndCD(a.appDir)
 	if err != nil {
@@ -172,17 +197,6 @@ func (a *Application) loadTokensIntoMem() ([]byte, int, error) {
 
 	bsLen := len(tokensFileAsBytes)
 	return tokensFileAsBytes, bsLen, nil
-}
-
-func mvToAppDir(appDir string) (bool, error) {
-	var result bool = false
-	err := os.Chdir(appDir)
-	if err != nil {
-		checkError(err, 0, 0)
-		return result, err
-	}
-	result = true
-	return result, nil
 }
 
 func (a *Application) handleArgs(args []string, argsLength int) error {
@@ -395,24 +409,6 @@ func (a *Application) selectOutput(dut map[string]map[string]string, mtt map[str
 	return nil
 }
 
-// Restructure err, 0, 0
-func checkError(err error, errorLevel, errorCode int) {
-	switch errorLevel {
-	case 0:
-		InfoLogger.Printf("test passed - error code:%v", errorCode)
-		return
-	case 1:
-		WarningLogger.Printf("error code %v:%s", errorCode, err)
-		return
-	case 2:
-		ErrorLogger.Printf("error code %v:%s", errorCode, err)
-		log.Fatal(err)
-	default:
-		err := fmt.Errorf("incorrect errorlevel integer: %v by errorcode: %v", errorLevel, errorCode)
-		log.Fatal(err)
-	}
-}
-
 func (a *Application) compareUrlsHistorically(urlsFound map[string]string) (map[string]map[string]string, map[string]map[string]string, error) {
 	var allUrlsAsBytes []byte
 	var domain, url string = "", ""
@@ -461,6 +457,86 @@ func (a *Application) compareUrlsHistorically(urlsFound map[string]string) (map[
 	return goodUrls, badUrls, nil
 }
 
+// Later functionality when there is alot data at some point we need condensing or checking
+// to or with a historicData file, these kind of programs need data regression to best dataset (size, quality, parsability,etc)
+// Do not remove
+func (a *Application) checkPrevRuntimes() error {
+	dirListing, err := os.ReadDir(a.appDir)
+	if err != nil {
+		checkError(err, 0, 0)
+		return err
+	}
+
+	if len(dirListing) < 1 {
+		InfoLogger.Printf("No previous data found\n")
+		a.previousRuntime = ""
+		return nil
+	}
+
+	currDateStr := time.Time.String(a.statistics.date)
+	compare, err := time.Parse(time.DateOnly, "2006-03-03")
+	checkError(err, 0, 0)
+	for _, dir := range dirListing {
+		tmp, err := time.Parse(time.DateOnly, dir.Name())
+		if err != nil {
+			checkError(err, 0, 0)
+			continue
+		}
+		if dir.Name() == currDateStr {
+			if !a.multiDaily {
+				err := fmt.Errorf("directory already exists %s", dir.Name())
+				checkError(err, 0, 0)
+				continue
+			} else {
+				a.previousRuntime = currDateStr
+				return nil
+			}
+		}
+		if tmp.After(compare) {
+			compare = tmp
+		}
+
+		if compare.After(a.statistics.date) {
+			err := fmt.Errorf("current date %v, is before a directory already made of date: %v", a.statistics.date, compare)
+			checkError(err, 0, 0)
+			return err
+		}
+	}
+	a.previousRuntime = time.Time.String(compare)
+	return nil
+}
+
+// Application Method End
+
+// Restructure err, 0, 0
+func checkError(err error, errorLevel, errorCode int) {
+	switch errorLevel {
+	case 0:
+		InfoLogger.Printf("test passed - error code:%v", errorCode)
+		return
+	case 1:
+		WarningLogger.Printf("error code %v:%s", errorCode, err)
+		return
+	case 2:
+		ErrorLogger.Printf("error code %v:%s", errorCode, err)
+		log.Fatal(err)
+	default:
+		err := fmt.Errorf("incorrect errorlevel integer: %v by errorcode: %v", errorLevel, errorCode)
+		log.Fatal(err)
+	}
+}
+
+func mvToAppDir(appDir string) (bool, error) {
+	var result bool = false
+	err := os.Chdir(appDir)
+	if err != nil {
+		checkError(err, 0, 0)
+		return result, err
+	}
+	result = true
+	return result, nil
+}
+
 func urlKeyToDomainString(keyUrl string) (string, error) {
 	parsedURL, err := url.Parse(keyUrl)
 	if err != nil {
@@ -480,6 +556,7 @@ func createFile(filepath string) error {
 	return nil
 }
 
+// https://www.tutorialspoint.com/golang-program-to-check-a-directory-is-exist-or-not#:~:text=Call%20the%20os.,the%20error%20type%20is%20os.
 func checkDirExists(dir string) (bool, error) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		checkError(err, 0, 0)
@@ -499,24 +576,6 @@ func checkFileExists(path string) (bool, error) {
 		return false, err
 	}
 	return true, nil
-}
-
-// InfoLogger.Printf("Something noteworthy happened\n")
-// WarningLogger.Printf("There is something you should know about\n")
-// ErrorLogger.Printf("Something went wrong\n")
-func initaliseLogging() error {
-	now := time.Now().UTC()
-	dateFormatted := now.Format("2006-01-01")
-	nameBuilder := strings.Builder{}
-	nameBuilder.WriteString(dateFormatted)
-	nameBuilder.WriteString(".log")
-	file, err := os.OpenFile(nameBuilder.String(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0661)
-	checkError(err, 0, 0)
-
-	InfoLogger = log.New(file, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
-	WarningLogger = log.New(file, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
-	ErrorLogger = log.New(file, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
-	return nil
 }
 
 // Map = domain + id : url
@@ -564,55 +623,6 @@ func mkDirAndCD(date string) error {
 		return err
 	}
 
-	return nil
-}
-
-// Later functionality when there is alot data at some point we need condensing or checking
-// to or with a historicData file, these kind of programs need data regression to best dataset (size, quality, parsability,etc)
-// Do not remove
-func (a *Application) checkPrevRuntimes() error {
-	dirListing, err := os.ReadDir(a.appDir)
-	if err != nil {
-		checkError(err, 0, 0)
-		return err
-	}
-
-	if len(dirListing) < 1 {
-		InfoLogger.Printf("No previous data found\n")
-		a.previousRuntime = ""
-		return nil
-	}
-
-	currDateStr := time.Time.String(a.statistics.date)
-	compare, err := time.Parse(time.DateOnly, "2006-03-03")
-	checkError(err, 0, 0)
-	for _, dir := range dirListing {
-		tmp, err := time.Parse(time.DateOnly, dir.Name())
-		if err != nil {
-			checkError(err, 0, 0)
-			continue
-		}
-		if dir.Name() == currDateStr {
-			if !a.multiDaily {
-				err := fmt.Errorf("directory already exists %s", dir.Name())
-				checkError(err, 0, 0)
-				continue
-			} else {
-				a.previousRuntime = currDateStr
-				return nil
-			}
-		}
-		if tmp.After(compare) {
-			compare = tmp
-		}
-
-		if compare.After(a.statistics.date) {
-			err := fmt.Errorf("current date %v, is before a directory already made of date: %v", a.statistics.date, compare)
-			checkError(err, 0, 0)
-			return err
-		}
-	}
-	a.previousRuntime = time.Time.String(compare)
 	return nil
 }
 
@@ -699,7 +709,7 @@ func parseAllBasePagesForLinksAndTitles(basePagesStdoutMap map[string]string) (m
 	basePageAllHrefs := make([]string, 0)
 	allUrlsAndTitles := make(map[string]string)
 	for siteUrl, page := range basePagesStdoutMap {
-		pageLines := strings.SplitAfterN(page, "\n", -1)
+		pageLines := strings.SplitAfterN(page, "\n\n", -1)
 		for _, line := range pageLines {
 			match, err := regexp.MatchString(hrefPathAndTitlesRegexp.String(), line)
 			if err != nil {
@@ -1035,11 +1045,7 @@ func main() {
 	if gzlopTestBoolean {
 		for key := range foundBaseLinksAndTitles {
 			for subKey, value := range foundBaseLinksAndTitles[key] {
-				titlesAsBytes := make([]byte, 0)
-				valueAsSlice := strings.SplitAfterN(value, " ", -1)
-				for i := 0; i <= len(value)-1; i++ {
-					titlesAsBytes = strconv.AppendQuote(titlesAsBytes, valueAsSlice[i])
-				}
+				titlesAsBytes := []byte(value)
 				result, err := gzlopBuffer(bytes.NewBuffer(titlesAsBytes), tokensArray)
 				if err != nil {
 					checkError(err, 0, 0)
@@ -1071,11 +1077,7 @@ func main() {
 				Url(subKey).
 				Titles(value).
 				Build()
-			valueAsSlice := strings.SplitAfterN(value, " ", -1)
-			titlesAsBytes := make([]byte, 0)
-			for h := 0; h <= len(valueAsSlice)-1; h++ {
-				titlesAsBytes = strconv.AppendQuote(titlesAsBytes, valueAsSlice[h])
-			}
+			titlesAsBytes := []byte(value)
 
 			var matchesFound, matchThreshold uint = 0, 5
 			for i := 0; i <= tokensArrayLen-1; i++ {
