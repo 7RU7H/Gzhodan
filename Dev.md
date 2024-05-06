@@ -100,7 +100,8 @@ Pieces then Asynchoronous HARMONY!
     - Local Article Parsing
         - https://github.com/anaskhan96/soup - DO NOT USE TO GET ANYTHING - just copy functionality to parse 
 - Intelligence Correlation
-    - `firefox -screenshot $URL --headless --window-size=1920,1080`
+ Firefox cannot be running, FF needs one display source, find flag for multiple gpus
+    - `firefox -screenshot $URL --window-size=1920,1080`
 
 
 - Gzombie
