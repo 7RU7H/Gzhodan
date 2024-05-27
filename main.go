@@ -19,6 +19,246 @@ import (
 	"time"
 )
 
+var (
+	WarningLogger *log.Logger
+	InfoLogger    *log.Logger
+	ErrorLogger   *log.Logger
+)
+
+func main() {
+	var dataDirectory, gzhodanConfig, multiDaily, optionalConfigs, tokensFile string
+	var noGzhodanConfig, markdownOnly, cliOnly, verboseOutput bool // weird and hacky given handleArgs(), but there you go
+	flag.BoolVar(&noGzhodanConfig, "g", false, "Use internally hardcoded configurations")
+	flag.StringVar(&gzhodanConfig, "G", "gzhodan.conf", "Provide a Gzhodan configuration file!")
+	flag.StringVar(&optionalConfigs, "O", "", "Optional configuration files seperated with a comma")
+	flag.StringVar(&dataDirectory, "o", "", "Directory for which previous and new data is read and written to")
+	flag.StringVar(&multiDaily, "m", "", "If application is running multiple times per day this is REQUIRED flag!")
+	flag.StringVar(&tokensFile, "t", "", "If Gzhodan requires custom tokens -- not compatible with -g or -G !!!")
+	flag.BoolVar(&markdownOnly, "M", false, "Verbose output is combinable with -V for verbose")
+	flag.BoolVar(&cliOnly, "C", false, "CLI only output is combinable with -V for verbose")
+	flag.BoolVar(&verboseOutput, "V", false, "Verbose output is combinable with -C or -M")
+	flag.Parse()
+
+	var gzlopTestBoolean bool = false
+	InfoLogger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	WarningLogger = log.New(os.Stdout, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
+	ErrorLogger = log.New(os.Stdout, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+
+	args, argsLen := os.Args, len(os.Args)
+	if argsLen > 2 {
+		flag.PrintDefaults()
+		err := fmt.Errorf("lack of arguments provided")
+		checkError(err, 0, 0)
+		os.Exit(1)
+	}
+
+	// Everything below need refactored into a method
+	appStartTime := time.Now()
+	dateFormatted := appStartTime.Format("2006-01-01")
+	nameBuilder := strings.Builder{}
+	nameBuilder.WriteString(dateFormatted)
+	nameBuilder.WriteString(".log")
+
+	app := Application{}
+	app.multiDaily = false
+	app.noGzhodanConfig = false
+	app.statistics = Statistics{}
+	app.statistics.appStartTime = appStartTime.UTC()
+	app.tmpDir = os.TempDir()
+	app.statistics.operatingSystem = runtime.GOOS
+	app.statistics.date = appStartTime
+	app.statistics.year = ""
+
+	err := app.handleArgs(args, argsLen)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+
+	err = app.checkPrevRuntimes()
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+
+	err = initaliseLogging()
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+	InfoLogger.Printf("Logging initialised")
+
+	err = app.CreateWorkingDir()
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+
+	urlsToVisit, baseDNSurlTotals, err := marshalURLsToMap()
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+	allBaseUrlsSeq := make([]string, 0, len(urlsToVisit))
+	for _, value := range urlsToVisit {
+		allBaseUrlsSeq = append(allBaseUrlsSeq, value)
+	}
+
+	totalUrls := 0
+	app.statistics.originalDomains = len(baseDNSurlTotals) - 1
+
+	for _, val := range baseDNSurlTotals {
+		totalUrls = +val
+	}
+
+	app.statistics.originalUrls = totalUrls
+	app.statistics.totalUrlsVisited += totalUrls
+
+	// Consider implecations of full implecation at some point...
+	var defaultThreadCount int = 10
+	threadCount := defaultThreadCount
+
+	basePagesStdoutMap, err := curlNewBasePages(allBaseUrlsSeq)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+
+	artefactsFromBasePages, err := parseAllBasePagesForLinksAndTitles(basePagesStdoutMap)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+
+	// map[string]map[string]string
+	foundBaseLinksAndTitles, failedLinksAndTitleByDomainMap, err := app.processCurrAndHistoricData(artefactsFromBasePages)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+
+	tokensArray, tokensArrayLen, err := app.loadTokensIntoMem()
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+
+	// DOUBLE CHECK!!
+	workerCount := threadCount
+	totalTokens := tokensArrayLen - 1
+	remainder := totalTokens % workerCount
+	concCurrOffset := 0
+	if workerCount <= totalTokens {
+		if workerCount > (totalTokens / 2) {
+			concCurrOffset = totalTokens / workerCount
+		}
+	} else {
+		workerCount = totalTokens
+		concCurrOffset = 1
+		remainder = 0
+	}
+
+	gzlopTestMap := make(map[string]map[int]string)
+	if gzlopTestBoolean {
+		for key := range foundBaseLinksAndTitles {
+			for subKey, value := range foundBaseLinksAndTitles[key] {
+				titlesAsBytes := []byte(value)
+				result, err := gzlopBuffer(bytes.NewBuffer(titlesAsBytes), tokensArray)
+				if err != nil {
+					checkError(err, 0, 0)
+				}
+				for resultsKey, resultsVal := range result {
+					addValueToNestedStrIntStrMap(gzlopTestMap, subKey, resultsKey, resultsVal)
+				}
+			}
+		}
+	}
+
+	TokensBuffer := newCircularBuffer(tokensArray, concCurrOffset, workerCount)
+	TokensBuffer.assignReadPointerOffsets(concCurrOffset, remainder)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+
+	titleTokeniserResults := make(map[string]*MatchOnTitles)
+	motBuilder := newMatchOnTitlesBuilder()
+
+	// TEST with gzlopBuffer for which is faster
+	workerId := 0 // Work-around pre Paralellism
+	// mutex foundBaseLinks
+	// go func (workerId int, foundBaseLinks map[string]map[string]string) {
+	for key := range foundBaseLinksAndTitles {
+		for subKey, value := range foundBaseLinksAndTitles[key] {
+			var bufferTokens, bufferTitles bytes.Buffer
+			domUrlMoT := motBuilder.
+				Url(subKey).
+				Titles(value).
+				Build()
+			titlesAsBytes := []byte(value)
+
+			var matchesFound, matchThreshold uint = 0, 5
+			for i := 0; i <= tokensArrayLen-1; i++ {
+				if matchThreshold != matchesFound {
+					for j := 0; j <= len(titlesAsBytes)-1; j++ {
+						bufferTokens.WriteByte(TokensBuffer.readCircularBufferFromOffset(workerId))
+						bufferTitles.WriteByte(titlesAsBytes[j])
+						tokenInBuf := bufferTokens.Bytes()
+						titleWordInBuf := bufferTitles.Bytes()
+						match := bytes.Compare(titleWordInBuf, tokenInBuf)
+						if match != 0 {
+							domUrlMoT.tokens = append(domUrlMoT.tokens, bufferTokens.String())
+							matchesFound++
+						}
+					}
+				} else {
+					domUrlMoT.count = matchesFound
+					break
+				}
+			}
+			titleTokeniserResults[key] = &domUrlMoT
+		}
+	}
+	// }()
+
+	passedTokenisedLinksAndTitleByDomainMap := make(map[string]map[string]string)
+	failedTokenisedLinksAndTitleByDomainMap := make(map[string]map[string]string)
+	for key, value := range titleTokeniserResults {
+		domain, err := urlKeyToDomainString(value.url)
+		if err != nil {
+			checkError(err, 0, 0)
+		}
+		switch value.count {
+		case 0:
+			addValueToNestedStrStrMap(failedTokenisedLinksAndTitleByDomainMap, domain, value.url, value.titles)
+			delete(titleTokeniserResults, key)
+		default:
+			addValueToNestedStrStrMap(passedTokenisedLinksAndTitleByDomainMap, key, value.url, value.titles)
+		}
+	}
+
+	for key := range passedTokenisedLinksAndTitleByDomainMap {
+		for urlSubKey := range passedTokenisedLinksAndTitleByDomainMap[key] {
+			InfoLogger.Printf("Attempting to curl: %s\n", urlSubKey)
+			curlNewArticles(strings.SplitAfterN(urlSubKey, "", -1))
+		}
+	}
+
+	err = backupDataStorage(app.historicDataFilePath)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+
+	err = updateDataStorage(app.historicDataFilePath, passedTokenisedLinksAndTitleByDomainMap, failedTokenisedLinksAndTitleByDomainMap)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+
+	app.statistics.totalFailedUrls = 0
+	for _, key := range failedLinksAndTitleByDomainMap {
+		app.statistics.totalFailedUrls = +len(key)
+	}
+	for _, key := range failedTokenisedLinksAndTitleByDomainMap {
+		app.statistics.totalFailedUrls = +len(key)
+	}
+
+	err = app.selectOutput(passedTokenisedLinksAndTitleByDomainMap, titleTokeniserResults, app.statistics.totalFailedUrls)
+	if err != nil {
+		checkError(err, 0, 0)
+	}
+
+}
+
 type Application struct {
 	appDir               string
 	tmpDir               string
@@ -113,12 +353,6 @@ func (m *MatchOnTitles) Build() MatchOnTitles {
 }
 
 // MatchOnTitles Methods End
-
-var (
-	WarningLogger *log.Logger
-	InfoLogger    *log.Logger
-	ErrorLogger   *log.Logger
-)
 
 // InfoLogger.Printf("Something noteworthy happened\n")
 // WarningLogger.Printf("There is something you should know about\n")
@@ -915,238 +1149,4 @@ func verboseMarkdownOutput(app *Application, domainUrlTitles map[string]map[stri
 func defaultOutput(app *Application, domainUrlTitles map[string]map[string]string, failedCount int) {
 	cliOnlyOutput(app, domainUrlTitles, failedCount)
 	markdownOnlyOutput(app, domainUrlTitles, failedCount)
-}
-
-func main() {
-	var dataDirectory, gzhodanConfig, multiDaily, noGzhodanConfig, optionalConfigs, tokensFile, markdownOnly, cliOnly, verboseOutput string
-	flag.StringVar(&noGzhodanConfig, "g", "", "Use internally hardcoded configurations")
-	flag.StringVar(&gzhodanConfig, "G", "gzhodan.conf", "Provide a Gzhodan configuration file!")
-	flag.StringVar(&optionalConfigs, "O", "", "Optional configuration files seperated with a comma")
-	flag.StringVar(&dataDirectory, "o", "", "Directory for which previous and new data is read and written to")
-	flag.StringVar(&multiDaily, "m", "", "If application is running multiple times per day this is REQUIRED flag!")
-	flag.StringVar(&tokensFile, "t", "", "If Gzhodan requires custom tokens -- not compatible with -g or -G !!!")
-	flag.StringVar(&markdownOnly, "M", "", "Verbose output is combinable with -V for verbose")
-	flag.StringVar(&cliOnly, "C", "", "CLI only output is combinable with -V for verbose")
-	flag.StringVar(&verboseOutput, "V", "", "Verbose output is combinable with -C or -M")
-	flag.Parse()
-
-	var gzlopTestBoolean bool = false
-
-	args, argsLen := os.Args, len(os.Args)
-	if argsLen > 2 {
-		flag.PrintDefaults()
-		err := fmt.Errorf("lack of arguments provided")
-		checkError(err, 0, 0)
-		os.Exit(1)
-	}
-
-	// Everything below need refactored into a method
-	appStartTime := time.Now()
-	dateFormatted := appStartTime.Format("2006-01-01")
-	nameBuilder := strings.Builder{}
-	nameBuilder.WriteString(dateFormatted)
-	nameBuilder.WriteString(".log")
-
-	InfoLogger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
-	WarningLogger = log.New(os.Stdout, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
-	ErrorLogger = log.New(os.Stdout, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
-
-	app := Application{}
-	app.multiDaily = false
-	app.noGzhodanConfig = false
-	app.statistics = Statistics{}
-	app.statistics.appStartTime = appStartTime.UTC()
-	app.tmpDir = os.TempDir()
-	app.statistics.operatingSystem = runtime.GOOS
-	app.statistics.date = appStartTime
-	app.statistics.year = ""
-
-	err := app.handleArgs(args, argsLen)
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-
-	err = app.checkPrevRuntimes()
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-
-	err = initaliseLogging()
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-	InfoLogger.Printf("Logging initialised")
-
-	err = app.CreateWorkingDir()
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-
-	urlsToVisit, baseDNSurlTotals, err := marshalURLsToMap()
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-	allBaseUrlsSeq := make([]string, 0, len(urlsToVisit))
-	for _, value := range urlsToVisit {
-		allBaseUrlsSeq = append(allBaseUrlsSeq, value)
-	}
-
-	totalUrls := 0
-	app.statistics.originalDomains = len(baseDNSurlTotals) - 1
-
-	for _, val := range baseDNSurlTotals {
-		totalUrls = +val
-	}
-
-	app.statistics.originalUrls = totalUrls
-	app.statistics.totalUrlsVisited += totalUrls
-
-	// Consider implecations of full implecation at some point...
-	var defaultThreadCount int = 10
-	threadCount := defaultThreadCount
-
-	basePagesStdoutMap, err := curlNewBasePages(allBaseUrlsSeq)
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-
-	artefactsFromBasePages, err := parseAllBasePagesForLinksAndTitles(basePagesStdoutMap)
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-
-	// map[string]map[string]string
-	foundBaseLinksAndTitles, failedLinksAndTitleByDomainMap, err := app.processCurrAndHistoricData(artefactsFromBasePages)
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-
-	tokensArray, tokensArrayLen, err := app.loadTokensIntoMem()
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-
-	// DOUBLE CHECK!!
-	workerCount := threadCount
-	totalTokens := tokensArrayLen - 1
-	remainder := totalTokens % workerCount
-	concCurrOffset := 0
-	if workerCount <= totalTokens {
-		if workerCount > (totalTokens / 2) {
-			concCurrOffset = totalTokens / workerCount
-		}
-	} else {
-		workerCount = totalTokens
-		concCurrOffset = 1
-		remainder = 0
-	}
-
-	gzlopTestMap := make(map[string]map[int]string)
-	if gzlopTestBoolean {
-		for key := range foundBaseLinksAndTitles {
-			for subKey, value := range foundBaseLinksAndTitles[key] {
-				titlesAsBytes := []byte(value)
-				result, err := gzlopBuffer(bytes.NewBuffer(titlesAsBytes), tokensArray)
-				if err != nil {
-					checkError(err, 0, 0)
-				}
-				for resultsKey, resultsVal := range result {
-					addValueToNestedStrIntStrMap(gzlopTestMap, subKey, resultsKey, resultsVal)
-				}
-			}
-		}
-	}
-
-	TokensBuffer := newCircularBuffer(tokensArray, concCurrOffset, workerCount)
-	TokensBuffer.assignReadPointerOffsets(concCurrOffset, remainder)
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-
-	titleTokeniserResults := make(map[string]*MatchOnTitles)
-	motBuilder := newMatchOnTitlesBuilder()
-
-	// TEST with gzlopBuffer for which is faster
-	workerId := 0 // Work-around pre Paralellism
-	// mutex foundBaseLinks
-	// go func (workerId int, foundBaseLinks map[string]map[string]string) {
-	for key := range foundBaseLinksAndTitles {
-		for subKey, value := range foundBaseLinksAndTitles[key] {
-			var bufferTokens, bufferTitles bytes.Buffer
-			domUrlMoT := motBuilder.
-				Url(subKey).
-				Titles(value).
-				Build()
-			titlesAsBytes := []byte(value)
-
-			var matchesFound, matchThreshold uint = 0, 5
-			for i := 0; i <= tokensArrayLen-1; i++ {
-				if matchThreshold != matchesFound {
-					for j := 0; j <= len(titlesAsBytes)-1; j++ {
-						bufferTokens.WriteByte(TokensBuffer.readCircularBufferFromOffset(workerId))
-						bufferTitles.WriteByte(titlesAsBytes[j])
-						tokenInBuf := bufferTokens.Bytes()
-						titleWordInBuf := bufferTitles.Bytes()
-						match := bytes.Compare(titleWordInBuf, tokenInBuf)
-						if match != 0 {
-							domUrlMoT.tokens = append(domUrlMoT.tokens, bufferTokens.String())
-							matchesFound++
-						}
-					}
-				} else {
-					domUrlMoT.count = matchesFound
-					break
-				}
-			}
-			titleTokeniserResults[key] = &domUrlMoT
-		}
-	}
-	// }()
-
-	passedTokenisedLinksAndTitleByDomainMap := make(map[string]map[string]string)
-	failedTokenisedLinksAndTitleByDomainMap := make(map[string]map[string]string)
-	for key, value := range titleTokeniserResults {
-		domain, err := urlKeyToDomainString(value.url)
-		if err != nil {
-			checkError(err, 0, 0)
-		}
-		switch value.count {
-		case 0:
-			addValueToNestedStrStrMap(failedTokenisedLinksAndTitleByDomainMap, domain, value.url, value.titles)
-			delete(titleTokeniserResults, key)
-		default:
-			addValueToNestedStrStrMap(passedTokenisedLinksAndTitleByDomainMap, key, value.url, value.titles)
-		}
-	}
-
-	for key := range passedTokenisedLinksAndTitleByDomainMap {
-		for urlSubKey := range passedTokenisedLinksAndTitleByDomainMap[key] {
-			InfoLogger.Printf("Attempting to curl: %s\n", urlSubKey)
-			curlNewArticles(strings.SplitAfterN(urlSubKey, "", -1))
-		}
-	}
-
-	err = backupDataStorage(app.historicDataFilePath)
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-
-	err = updateDataStorage(app.historicDataFilePath, passedTokenisedLinksAndTitleByDomainMap, failedTokenisedLinksAndTitleByDomainMap)
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-
-	app.statistics.totalFailedUrls = 0
-	for _, key := range failedLinksAndTitleByDomainMap {
-		app.statistics.totalFailedUrls = +len(key)
-	}
-	for _, key := range failedTokenisedLinksAndTitleByDomainMap {
-		app.statistics.totalFailedUrls = +len(key)
-	}
-
-	err = app.selectOutput(passedTokenisedLinksAndTitleByDomainMap, titleTokeniserResults, app.statistics.totalFailedUrls)
-	if err != nil {
-		checkError(err, 0, 0)
-	}
-
 }
