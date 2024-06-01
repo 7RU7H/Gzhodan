@@ -45,14 +45,14 @@ func main() {
 	ErrorLogger = log.New(os.Stdout, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
 
 	args, argsLen := os.Args, len(os.Args)
-	if argsLen > 2 {
+	if argsLen < 2 { // For histroric WOW that was stupid this was >, instead of < ; amazing!
 		flag.PrintDefaults()
-		err := fmt.Errorf("lack of arguments provided")
+		err := fmt.Errorf("lack of arguments provided, maybe try -h more")
 		checkError(err, 0, 0)
 		os.Exit(1)
 	}
 
-	// Everything below need refactored into a method
+	// Everything below need refactored into a method at some point after this works, because that is sort of pretending like you are working
 	appStartTime := time.Now()
 	dateFormatted := appStartTime.Format("2006-01-01")
 	nameBuilder := strings.Builder{}
@@ -71,7 +71,7 @@ func main() {
 
 	err := app.handleArgs(args, argsLen)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 	}
 
 	err = app.checkPrevRuntimes()
@@ -81,7 +81,7 @@ func main() {
 
 	err = initaliseLogging()
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 	}
 	InfoLogger.Printf("Logging initialised")
 
@@ -115,23 +115,23 @@ func main() {
 
 	basePagesStdoutMap, err := curlNewBasePages(allBaseUrlsSeq)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 	}
 
 	artefactsFromBasePages, err := parseAllBasePagesForLinksAndTitles(basePagesStdoutMap)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 	}
 
 	// map[string]map[string]string
 	foundBaseLinksAndTitles, failedLinksAndTitleByDomainMap, err := app.processCurrAndHistoricData(artefactsFromBasePages)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 	}
 
 	tokensArray, tokensArrayLen, err := app.loadTokensIntoMem()
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 	}
 
 	// DOUBLE CHECK!!
@@ -156,7 +156,7 @@ func main() {
 				titlesAsBytes := []byte(value)
 				result, err := gzlopBuffer(bytes.NewBuffer(titlesAsBytes), tokensArray)
 				if err != nil {
-					checkError(err, 0, 0)
+					checkError(err, 1, 0)
 				}
 				for resultsKey, resultsVal := range result {
 					addValueToNestedStrIntStrMap(gzlopTestMap, subKey, resultsKey, resultsVal)
@@ -168,7 +168,7 @@ func main() {
 	TokensBuffer := newCircularBuffer(tokensArray, concCurrOffset, workerCount)
 	TokensBuffer.assignReadPointerOffsets(concCurrOffset, remainder)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 	}
 
 	titleTokeniserResults := make(map[string]*MatchOnTitles)
@@ -216,7 +216,7 @@ func main() {
 	for key, value := range titleTokeniserResults {
 		domain, err := urlKeyToDomainString(value.url)
 		if err != nil {
-			checkError(err, 0, 0)
+			checkError(err, 2, 0) // bad domain and url avoidance
 		}
 		switch value.count {
 		case 0:
@@ -236,12 +236,15 @@ func main() {
 
 	err = backupDataStorage(app.historicDataFilePath)
 	if err != nil {
-		checkError(err, 0, 0)
+		// dumpMemoryToSaveData
+		checkError(err, 2, 0) // failed to backup, dump memory (if I can find a way) and backup to backuping up and prevent updating
 	}
 
 	err = updateDataStorage(app.historicDataFilePath, passedTokenisedLinksAndTitleByDomainMap, failedTokenisedLinksAndTitleByDomainMap)
 	if err != nil {
-		checkError(err, 0, 0)
+		// The desire to feature creep a POST output reminder struct is growing - reminder to manually updateData
+		// dumpData to update to a file for later diff-age
+		checkError(err, 1, 0) // Needs investigation to manual fix data
 	}
 
 	app.statistics.totalFailedUrls = 0
@@ -254,7 +257,8 @@ func main() {
 
 	err = app.selectOutput(passedTokenisedLinksAndTitleByDomainMap, titleTokeniserResults, app.statistics.totalFailedUrls)
 	if err != nil {
-		checkError(err, 0, 0)
+		// dumpData to file
+		checkError(err, 2, 0) // Output is the product, no product
 	}
 
 }
@@ -265,6 +269,7 @@ type Application struct {
 	testDir              string
 	previousRuntime      string
 	historicDataFilePath string
+	historicDataAsBytes  []byte
 	statistics           Statistics
 	noGzhodanConfig      bool
 	multiDaily           bool
@@ -364,7 +369,7 @@ func initaliseLogging() error {
 	nameBuilder.WriteString(dateFormatted)
 	nameBuilder.WriteString(".log")
 	file, err := os.OpenFile(nameBuilder.String(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0661)
-	checkError(err, 0, 0)
+	checkError(err, 2, 0) // No logging = sadness
 
 	InfoLogger = log.New(file, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
 	WarningLogger = log.New(file, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile)
@@ -376,14 +381,14 @@ func initaliseLogging() error {
 func (a *Application) CreateWorkingDir() error {
 	err := mkDirAndCD(a.appDir)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 1, 0)
 		return err
 	}
 
 	dirTree := []string{"test", "logs", "newletters", a.statistics.year}
 	err = mkAppDirTree(a.appDir, dirTree)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 1, 0)
 		return err
 	}
 	a.testDir = filepath.Join(a.appDir, "test")
@@ -394,7 +399,7 @@ func (app *Application) processCurrAndHistoricData(artefactsFromBasePages map[st
 	if app.historicDataFilePath != "" {
 		foundBaseLinksAndTitles, foundHistoricLinks, err := app.compareUrlsHistorically(artefactsFromBasePages)
 		if err != nil {
-			checkError(err, 0, 0)
+			checkError(err, 1, 0)
 			return nil, nil, err
 		}
 		for key := range foundHistoricLinks {
@@ -407,7 +412,7 @@ func (app *Application) processCurrAndHistoricData(artefactsFromBasePages map[st
 		for urlKey, titlesValue := range artefactsFromBasePages {
 			domain, err := urlKeyToDomainString(urlKey)
 			if err != nil {
-				checkError(err, 0, 0)
+				checkError(err, 1, 0)
 				return nil, nil, err
 			}
 			addValueToNestedStrStrMap(foundBaseLinksAndTitles, domain, urlKey, titlesValue)
@@ -422,11 +427,11 @@ func (app *Application) processCurrAndHistoricData(artefactsFromBasePages map[st
 func (a *Application) loadTokensIntoMem() ([]byte, int, error) {
 	exists, err := checkFileExists(a.tokensFile)
 	if err != nil || !exists {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 	}
 	tokensFileAsBytes, err := os.ReadFile(a.tokensFile)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 	}
 
 	bsLen := len(tokensFileAsBytes)
@@ -444,7 +449,7 @@ func (a *Application) handleArgs(args []string, argsLength int) error {
 	if tmpAppDir != "" {
 		appDirExists, err := checkDirExists(tmpAppDir)
 		if err != nil || !appDirExists {
-			checkError(err, 0, 0)
+			checkError(err, 1, 0)
 			WarningLogger.Printf("No historic data file provided to compare new url with previously enumerated data, this may take a lot longer!")
 		} else {
 			a.appDir = tmpAppDir
@@ -452,17 +457,17 @@ func (a *Application) handleArgs(args []string, argsLength int) error {
 		a.appDir = tmpAppDir
 		mvStat, err := mvToAppDir(tmpAppDir)
 		if err != nil || !mvStat {
-			checkError(err, 0, 0)
-			WarningLogger.Printf("unable to move to the specified application directory: %s", tmpAppDir)
+			checkError(err, 1, 0)
+			WarningLogger.Printf("Unable to move to the specified application directory: %s", tmpAppDir)
 		} else {
 			wd, err := os.Getwd()
 			if err != nil || wd == "" {
-				checkError(err, 0, 0)
+				checkError(err, 2, 0)
 			}
-			InfoLogger.Printf("current application directory changed to %s", wd)
+			InfoLogger.Printf("Current application directory changed to %s", wd)
 		}
 	}
-
+	//break but not break out to to add, everytime it loops we get a invalid arguments error - double check
 	for i := 0; i <= argsLength-1; i++ {
 		switch args[i] {
 		case "-m":
@@ -470,7 +475,7 @@ func (a *Application) handleArgs(args []string, argsLength int) error {
 		case "-H":
 			historicDataExists, err := checkFileExists(args[i+1])
 			if err != nil || !historicDataExists {
-				checkError(err, 0, 0)
+				checkError(err, 1, 0)
 				WarningLogger.Printf("No historic data file provided to compare new url with previously enumerated data, this may take a lot longer!")
 			} else {
 				a.historicDataFilePath = args[i+1]
@@ -481,7 +486,7 @@ func (a *Application) handleArgs(args []string, argsLength int) error {
 			for _, config := range configListSlice {
 				exists, err := checkFileExists(config)
 				if err != nil || !exists {
-					checkError(err, 0, 0)
+					checkError(err, 2, 0)
 					continue
 				}
 				var key string
@@ -506,13 +511,13 @@ func (a *Application) handleArgs(args []string, argsLength int) error {
 		case "-t":
 			exists, err := checkFileExists(args[i+1])
 			if err != nil || !exists {
-				checkError(err, 0, 0)
+				checkError(err, 2, 0)
 			}
 			a.tokensFile = args[i+1]
 		case "-G":
 			exists, err := checkFileExists(args[i+1])
 			if err != nil || !exists {
-				checkError(err, 0, 0)
+				checkError(err, 2, 0)
 			}
 			a.gzhodanConfig = args[i+1]
 		case "-g":
@@ -535,7 +540,7 @@ func (a *Application) handleArgs(args []string, argsLength int) error {
 			} else {
 				a.outputType = "V"
 			}
-		default:
+		default: // Is this correct if it always prints..
 			err := fmt.Errorf("invalid arguments provided: %v", args)
 			checkError(err, 0, 0)
 		}
@@ -551,7 +556,7 @@ func (a *Application) handleArgs(args []string, argsLength int) error {
 func (a *Application) copyFilesToAppDir(src string) error {
 	fin, err := os.Open(src)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 		return err
 	}
 	defer fin.Close()
@@ -564,24 +569,25 @@ func (a *Application) copyFilesToAppDir(src string) error {
 		dst = a.appDir + "/" + fin.Name()
 	default:
 		err := fmt.Errorf("unsupported os for filepath trimming of delimited %s", OS)
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 		return err
 	}
 
 	fout, err := os.Create(dst)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 	}
 	defer fout.Close()
 
 	_, err = io.Copy(fout, fin)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 	}
 	return nil
 
 }
 
+// More switch blocks issue
 func (a *Application) selectOutput(dut map[string]map[string]string, mtt map[string]*MatchOnTitles, failedCount int) error {
 	argsSize := len(a.outputType)
 	var argsId int = 0
@@ -623,36 +629,41 @@ func (a *Application) selectOutput(dut map[string]map[string]string, mtt map[str
 	}
 
 	switch argsId {
-	case 1: // verbose
+	case 1:
 		verboseOutput(a, dut, mtt, failedCount)
-	case 2: // cli only
+		return nil
+	case 2:
 		cliOnlyOutput(a, dut, failedCount)
-	case 3: // verbose cli only
+		return nil
+	case 3:
 		verboseCliOutput(a, dut, mtt, failedCount)
-	case 5: // markdown only
+		return nil
+	case 5:
 		markdownOnlyOutput(a, dut, failedCount)
-	case 6: // verbose markdown
+		return nil
+	case 6:
 		verboseMarkdownOutput(a, dut, mtt, failedCount)
+		return nil
 	case 0:
 		defaultOutput(a, dut, failedCount)
+		return nil
 	default:
 		err := fmt.Errorf("invalid arg idenfier counted %v", argsId)
 		checkError(err, 0, 0)
 		return err
 	}
-	return nil
 }
 
-func (a *Application) compareUrlsHistorically(urlsFound map[string]string) (map[string]map[string]string, map[string]map[string]string, error) {
+// if else block issues
+func (a *Application) compareUrlsHistorically(urlsFound map[string]string) (goodUrls map[string]map[string]string, badUrls map[string]map[string]string, err error) {
 	var allUrlsAsBytes []byte
 	var domain, url string = "", ""
-	exists, err := checkFileExists(a.historicDataFilePath)
-	if err != nil || !exists {
-		checkError(err, 0, 0)
-	}
-	historicDataAsBytes, err := os.ReadFile(a.historicDataFilePath)
-	if err != nil {
-		checkError(err, 0, 0)
+	if a.historicDataFilePath != "" {
+		a.historicDataAsBytes, err = os.ReadFile(a.historicDataFilePath)
+		if err != nil {
+			checkError(err, 2, 0)
+			return nil, nil, err
+		}
 	}
 
 	allTitles := make(map[int]string)
@@ -663,17 +674,14 @@ func (a *Application) compareUrlsHistorically(urlsFound map[string]string) (map[
 		i++
 	}
 
-	goodUrls := make(map[string]map[string]string)
-	badUrls := make(map[string]map[string]string)
-
-	dateAsBytesSize := len(historicDataAsBytes)
+	dateAsBytesSize := len(a.historicDataAsBytes)
 	for _, urlAsBytes := range allUrlsAsBytes {
 		for i := 0; i <= dateAsBytesSize-1; i++ {
-			if historicDataAsBytes[i] == urlAsBytes {
+			if a.historicDataAsBytes[i] == urlAsBytes {
 				url = string(urlAsBytes)
 				domain, err = urlKeyToDomainString(url)
 				if err != nil {
-					checkError(err, 0, 0)
+					checkError(err, 1, 0)
 				}
 				addValueToNestedStrStrMap(goodUrls, domain, url, allTitles[i])
 				domain, url = "", ""
@@ -681,7 +689,7 @@ func (a *Application) compareUrlsHistorically(urlsFound map[string]string) (map[
 				url = string(urlAsBytes)
 				domain, err = urlKeyToDomainString(url)
 				if err != nil {
-					checkError(err, 0, 0)
+					checkError(err, 1, 0)
 				}
 				addValueToNestedStrStrMap(badUrls, domain, url, allTitles[i])
 			}
@@ -697,7 +705,7 @@ func (a *Application) compareUrlsHistorically(urlsFound map[string]string) (map[
 func (a *Application) checkPrevRuntimes() error {
 	dirListing, err := os.ReadDir(a.appDir)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 		return err
 	}
 
@@ -709,17 +717,21 @@ func (a *Application) checkPrevRuntimes() error {
 
 	currDateStr := time.Time.String(a.statistics.date)
 	compare, err := time.Parse(time.DateOnly, "2006-03-03")
-	checkError(err, 0, 0)
+	if err != nil {
+		checkError(err, 2, 0)
+		return err
+	}
+
 	for _, dir := range dirListing {
 		tmp, err := time.Parse(time.DateOnly, dir.Name())
 		if err != nil {
-			checkError(err, 0, 0)
+			checkError(err, 2, 0)
 			continue
 		}
 		if dir.Name() == currDateStr {
 			if !a.multiDaily {
 				err := fmt.Errorf("directory already exists %s", dir.Name())
-				checkError(err, 0, 0)
+				checkError(err, 1, 0)
 				continue
 			} else {
 				a.previousRuntime = currDateStr
@@ -732,7 +744,7 @@ func (a *Application) checkPrevRuntimes() error {
 
 		if compare.After(a.statistics.date) {
 			err := fmt.Errorf("current date %v, is before a directory already made of date: %v", a.statistics.date, compare)
-			checkError(err, 0, 0)
+			checkError(err, 2, 0)
 			return err
 		}
 	}
@@ -744,6 +756,7 @@ func (a *Application) checkPrevRuntimes() error {
 
 // Restructure err, 0, 0
 func checkError(err error, errorLevel, errorCode int) {
+	fmt.Println("Error occured: ", err)
 	switch errorLevel {
 	case 0:
 		InfoLogger.Printf("test passed - error code:%v", errorCode)
@@ -764,7 +777,7 @@ func mvToAppDir(appDir string) (bool, error) {
 	var result bool = false
 	err := os.Chdir(appDir)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 1, 0)
 		return result, err
 	}
 	result = true
@@ -775,7 +788,7 @@ func urlKeyToDomainString(keyUrl string) (string, error) {
 	parsedURL, err := url.Parse(keyUrl)
 	if err != nil {
 		err := fmt.Errorf("invalid url: %s", keyUrl)
-		checkError(err, 0, 0)
+		checkError(err, 1, 0)
 	}
 	return parsedURL.Hostname(), nil
 }
@@ -784,7 +797,7 @@ func createFile(filepath string) error {
 	filePtr, err := os.Create(filepath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "File Creation Error:", err)
-		checkError(err, 0, 0)
+		checkError(err, 1, 0)
 	}
 	defer filePtr.Close()
 	return nil
@@ -793,7 +806,7 @@ func createFile(filepath string) error {
 // https://www.tutorialspoint.com/golang-program-to-check-a-directory-is-exist-or-not#:~:text=Call%20the%20os.,the%20error%20type%20is%20os.
 func checkDirExists(dir string) (bool, error) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		checkError(err, 0, 0)
+		checkError(err, 1, 0)
 		return false, err
 	}
 	return true, nil
@@ -802,11 +815,11 @@ func checkDirExists(dir string) (bool, error) {
 func checkFileExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err != nil {
-		log.Fatal(err)
+		checkError(err, 1, 0)
 		return false, err
 	}
 	if os.IsNotExist(err) {
-		log.Fatal("File path does not exist")
+		checkError(err, 1, 0)
 		return false, err
 	}
 	return true, nil
@@ -815,7 +828,9 @@ func checkFileExists(path string) (bool, error) {
 // Map = domain + id : url
 func marshalURLsToMap() (map[string]string, map[string]int, error) {
 	file, err := os.Open("urls.txt")
-	checkError(err, 0, 0)
+	if err != nil {
+		checkError(err, 2, 0)
+	}
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
@@ -824,7 +839,7 @@ func marshalURLsToMap() (map[string]string, map[string]int, error) {
 	domainCounter := make(map[string]int)
 	for scanner.Scan() {
 		if err := scanner.Err(); err != nil {
-			panic(err)
+			checkError(err, 2, 0)
 		}
 		urlStr = scanner.Text()
 		parsedURL, err := url.Parse(urlStr)
@@ -848,12 +863,12 @@ func marshalURLsToMap() (map[string]string, map[string]int, error) {
 
 func mkDirAndCD(date string) error {
 	if err := os.Mkdir(date, os.ModePerm); err != nil {
-		log.Fatal(err)
+		checkError(err, 1, 0)
 		return err
 	}
 	err := os.Chdir(date)
 	if err != nil {
-		log.Fatal(err)
+		checkError(err, 1, 0)
 		return err
 	}
 
@@ -865,7 +880,7 @@ func mkAppDirTree(appDir string, dirTree []string) error {
 	for _, dirName := range dirTree {
 		PathAndName = filepath.Join(appDir, dirName)
 		if err := os.Mkdir(PathAndName, os.ModePerm); err != nil {
-			log.Fatal(err)
+			checkError(err, 1, 0)
 			return err
 		}
 	}
@@ -878,7 +893,9 @@ func curlNewBasePages(urlArr []string) (map[string]string, error) {
 	for _, url := range urlArr {
 		runCurl := exec.Command("curl", args, url)
 		outputBytes, err := runCurl.Output()
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 1, 0)
+		}
 		result[url] = string(outputBytes[:])
 	}
 	return result, nil
@@ -890,7 +907,10 @@ func curlNewArticles(urlArr []string) error {
 	urlsStr := strings.Join(urlArr, " ")
 	runCurl := exec.Command("curl", args, urlsStr)
 	err := runCurl.Run()
-	checkError(err, 0, 0)
+	if err != nil {
+		checkError(err, 1, 0)
+		return err
+	}
 	return nil
 }
 
@@ -910,8 +930,7 @@ func gzlopBuffer(buffer *bytes.Buffer, patterns []byte) (map[int]string, error) 
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 	}
 	return artifacts, nil
 }
@@ -947,7 +966,7 @@ func parseAllBasePagesForLinksAndTitles(basePagesStdoutMap map[string]string) (m
 		for _, line := range pageLines {
 			match, err := regexp.MatchString(hrefPathAndTitlesRegexp.String(), line)
 			if err != nil {
-				checkError(err, 0, 0)
+				checkError(err, 1, 0)
 			}
 			if match {
 				basePageAllHrefs = append(basePageAllHrefs, line)
@@ -967,22 +986,22 @@ func parseAllBasePagesForLinksAndTitles(basePagesStdoutMap map[string]string) (m
 func defangUrl(inputUrl string) string {
 	tmpUrl := strings.ReplaceAll(inputUrl, "http", "hxxp")
 	tmpUrl = strings.ReplaceAll(tmpUrl, "://", "[://]")
-	outputUrl := strings.ReplaceAll(tmpUrl, ".", "[.]")
-	return outputUrl
+	return strings.ReplaceAll(tmpUrl, ".", "[.]")
 }
 
+// Idea for dump dataToUpdate to a new file if unsuccessful
 // https://gosamples.dev/write-file/
 func updateDataStorage(file string, passed map[string]map[string]string, failed map[string]map[string]string) error {
 	f, err := os.Open(file)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 	}
 	defer f.Close()
 	for key := range passed {
 		for subKey := range passed[key] {
 			_, err := f.WriteString(subKey + "\n")
 			if err != nil {
-				checkError(err, 0, 0)
+				checkError(err, 1, 0)
 			}
 		}
 	}
@@ -990,7 +1009,7 @@ func updateDataStorage(file string, passed map[string]map[string]string, failed 
 		for subKey := range failed[key] {
 			_, err := f.WriteString(subKey + "\n")
 			if err != nil {
-				checkError(err, 0, 0)
+				checkError(err, 1, 0)
 			}
 		}
 	}
@@ -1001,24 +1020,32 @@ func updateDataStorage(file string, passed map[string]map[string]string, failed 
 func backupDataStorage(src string) error {
 	fin, err := os.Open(src)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 1, 0)
 		err = createFile(src)
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 2, 0)
+			return err
+		}
 		fin, err = os.Open(src)
-		checkError(err, 0, 0)
+		if err != nil {
+			checkError(err, 2, 0)
+			return err
+		}
 	}
 	defer fin.Close()
 
 	dst := fin.Name() + ".bak"
 	fout, err := os.Create(dst)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
+		return err
 	}
 	defer fout.Close()
 
 	_, err = io.Copy(fout, fin)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
+		return err
 	}
 	return nil
 }
@@ -1037,34 +1064,35 @@ func cliOnlyOutput(app *Application, domainUrlTitles map[string]map[string]strin
 	}
 	io.WriteString(os.Stdout, fmt.Sprintf("Successful URLs found: %v\n", successfulUrls))
 	io.WriteString(os.Stdout, fmt.Sprintf("Failed URLs (As of previous runtime file: %v) refound: %v\n", app.historicDataFilePath, failedCount))
-
 }
 
 func lsCdTouchMarkdownFile(appDir string, date time.Time) (*os.File, error) {
 	currDir, err := os.Getwd()
-	checkError(err, 0, 0)
+	if err != nil {
+		checkError(err, 1, 0)
+	}
 	if currDir != appDir {
 		err := fmt.Errorf("current directory %v is not application specified directory: %v for some weird reason - must debug", currDir, appDir)
-		checkError(err, 0, 0)
+		checkError(err, 1, 0)
 		return nil, err
 	}
 	err = os.Chdir("newsletters")
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 1, 0)
 		return nil, err
 	}
 
 	mdFilename := date.Format(time.DateOnly) + ".md"
 	exists, err := checkFileExists(mdFilename)
-	checkError(err, 0, 0)
-	if !exists {
+	if err != nil || exists {
 		err := fmt.Errorf("file with filename %v already exists", mdFilename)
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 		return nil, err
 	}
 	fout, err := os.Create(mdFilename)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
+		return nil, err
 	}
 	return fout, nil
 }
@@ -1072,7 +1100,8 @@ func lsCdTouchMarkdownFile(appDir string, date time.Time) (*os.File, error) {
 func cdUpFromNewletters() error {
 	err := os.Chdir("../")
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 1, 0)
+		return err
 	}
 	return nil
 }
@@ -1080,7 +1109,7 @@ func cdUpFromNewletters() error {
 func markdownOnlyOutput(app *Application, domainUrlTitles map[string]map[string]string, failedCount int) error {
 	file, err := lsCdTouchMarkdownFile(app.appDir, app.statistics.date)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 		return err
 	}
 	defer file.Close()
@@ -1120,7 +1149,7 @@ func verboseCliOutput(app *Application, domainUrlTitles map[string]map[string]st
 func verboseMarkdownOutput(app *Application, domainUrlTitles map[string]map[string]string, matchedTitles map[string]*MatchOnTitles, failedCount int) error {
 	file, err := lsCdTouchMarkdownFile(app.appDir, app.statistics.date)
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 2, 0)
 		return err
 	}
 	defer file.Close()
