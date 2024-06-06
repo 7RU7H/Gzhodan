@@ -31,7 +31,7 @@ func main() {
 	flag.BoolVar(&noGzhodanConfig, "g", false, "Use internally hardcoded configurations")
 	flag.StringVar(&gzhodanConfig, "G", "gzhodan.conf", "Provide a Gzhodan configuration file!")
 	flag.StringVar(&optionalConfigs, "O", "", "Optional configuration files seperated with a comma")
-	flag.StringVar(&dataDirectory, "o", "", "Directory for which previous and new data is read and written to")
+	flag.StringVar(&dataDirectory, "o", "", "Must provide full path for directory for which previous and new data is read and written to")
 	flag.StringVar(&multiDaily, "m", "", "If application is running multiple times per day this is REQUIRED flag!")
 	flag.StringVar(&tokensFile, "t", "", "If Gzhodan requires custom tokens -- not compatible with -g or -G !!!")
 	flag.BoolVar(&markdownOnly, "M", false, "Verbose output is combinable with -V for verbose")
@@ -69,30 +69,30 @@ func main() {
 	app.statistics.date = appStartTime
 	app.statistics.year = ""
 
-	err := app.handleArgs(args, argsLen)
+	err := initaliseLogging()
 	if err != nil {
-		checkError(err, 2, 0)
+		checkError(err, 2, 3)
+	}
+	InfoLogger.Println("Logging initialised")
+
+	err = app.handleArgs(args, argsLen)
+	if err != nil {
+		checkError(err, 2, 1)
 	}
 
 	err = app.checkPrevRuntimes()
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 0, 2)
 	}
-
-	err = initaliseLogging()
-	if err != nil {
-		checkError(err, 2, 0)
-	}
-	InfoLogger.Printf("Logging initialised")
 
 	err = app.CreateWorkingDir()
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 0, 4)
 	}
 
 	urlsToVisit, baseDNSurlTotals, err := marshalURLsToMap()
 	if err != nil {
-		checkError(err, 0, 0)
+		checkError(err, 0, 5)
 	}
 	allBaseUrlsSeq := make([]string, 0, len(urlsToVisit))
 	for _, value := range urlsToVisit {
@@ -115,23 +115,23 @@ func main() {
 
 	basePagesStdoutMap, err := curlNewBasePages(allBaseUrlsSeq)
 	if err != nil {
-		checkError(err, 2, 0)
+		checkError(err, 2, 6)
 	}
 
 	artefactsFromBasePages, err := parseAllBasePagesForLinksAndTitles(basePagesStdoutMap)
 	if err != nil {
-		checkError(err, 2, 0)
+		checkError(err, 2, 7)
 	}
 
 	// map[string]map[string]string
 	foundBaseLinksAndTitles, failedLinksAndTitleByDomainMap, err := app.processCurrAndHistoricData(artefactsFromBasePages)
 	if err != nil {
-		checkError(err, 2, 0)
+		checkError(err, 2, 8)
 	}
 
 	tokensArray, tokensArrayLen, err := app.loadTokensIntoMem()
 	if err != nil {
-		checkError(err, 2, 0)
+		checkError(err, 2, 9)
 	}
 
 	// DOUBLE CHECK!!
@@ -156,7 +156,7 @@ func main() {
 				titlesAsBytes := []byte(value)
 				result, err := gzlopBuffer(bytes.NewBuffer(titlesAsBytes), tokensArray)
 				if err != nil {
-					checkError(err, 1, 0)
+					checkError(err, 1, 10)
 				}
 				for resultsKey, resultsVal := range result {
 					addValueToNestedStrIntStrMap(gzlopTestMap, subKey, resultsKey, resultsVal)
@@ -168,7 +168,7 @@ func main() {
 	TokensBuffer := newCircularBuffer(tokensArray, concCurrOffset, workerCount)
 	TokensBuffer.assignReadPointerOffsets(concCurrOffset, remainder)
 	if err != nil {
-		checkError(err, 2, 0)
+		checkError(err, 2, 11)
 	}
 
 	titleTokeniserResults := make(map[string]*MatchOnTitles)
@@ -216,7 +216,7 @@ func main() {
 	for key, value := range titleTokeniserResults {
 		domain, err := urlKeyToDomainString(value.url)
 		if err != nil {
-			checkError(err, 2, 0) // bad domain and url avoidance
+			checkError(err, 2, 11) // bad domain and url avoidance
 		}
 		switch value.count {
 		case 0:
@@ -237,14 +237,14 @@ func main() {
 	err = backupDataStorage(app.historicDataFilePath)
 	if err != nil {
 		// dumpMemoryToSaveData
-		checkError(err, 2, 0) // failed to backup, dump memory (if I can find a way) and backup to backuping up and prevent updating
+		checkError(err, 2, 12) // failed to backup, dump memory (if I can find a way) and backup to backuping up and prevent updating
 	}
 
 	err = updateDataStorage(app.historicDataFilePath, passedTokenisedLinksAndTitleByDomainMap, failedTokenisedLinksAndTitleByDomainMap)
 	if err != nil {
 		// The desire to feature creep a POST output reminder struct is growing - reminder to manually updateData
 		// dumpData to update to a file for later diff-age
-		checkError(err, 1, 0) // Needs investigation to manual fix data
+		checkError(err, 1, 13) // Needs investigation to manual fix data
 	}
 
 	app.statistics.totalFailedUrls = 0
@@ -258,7 +258,7 @@ func main() {
 	err = app.selectOutput(passedTokenisedLinksAndTitleByDomainMap, titleTokeniserResults, app.statistics.totalFailedUrls)
 	if err != nil {
 		// dumpData to file
-		checkError(err, 2, 0) // Output is the product, no product
+		checkError(err, 2, 14) // Output is the product, no product
 	}
 
 }
@@ -277,6 +277,7 @@ type Application struct {
 	gzhodanConfig        string
 	optionalConfigs      map[string]string
 	tokensFile           string
+	urlsFile             string
 }
 
 type Statistics struct {
@@ -392,6 +393,7 @@ func (a *Application) CreateWorkingDir() error {
 		return err
 	}
 	a.testDir = filepath.Join(a.appDir, "test")
+
 	return nil
 }
 
@@ -540,10 +542,29 @@ func (a *Application) handleArgs(args []string, argsLength int) error {
 			} else {
 				a.outputType = "V"
 			}
-		default: // Is this correct if it always prints..
-			err := fmt.Errorf("invalid arguments provided: %v", args)
-			checkError(err, 0, 0)
+		default:
+			if i != 0 {
+				InfoLogger.Println("For flag " + args[i-1] + " the argument provided was " + args[i])
+			}
 		}
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		checkError(err, 2, 0)
+	}
+
+	if a.tokensFile == "" {
+		InfoLogger.Println("Using the default tokens.txt from the directory if you git cloned and built from source - one day I will go install, sorry KISS")
+		defaultTokensFile := wd + "tokens.txt"
+		checkPathsMatchArray, a.tokensFile = append(checkPathsMatchArray, defaultTokensFile), defaultTokensFile
+	}
+
+	if a.urlsFile == "" {
+		InfoLogger.Println("Using the default tokens.txt from the directory if you git cloned and built from source - one day I will go install, sorry KISS")
+		defaultUrlsFile := wd + "urls.txt"
+		checkPathsMatchArray, a.urlsFile = append(checkPathsMatchArray, defaultUrlsFile), defaultUrlsFile
+
 	}
 
 	for _, path := range checkPathsMatchArray {
@@ -648,7 +669,7 @@ func (a *Application) selectOutput(dut map[string]map[string]string, mtt map[str
 		defaultOutput(a, dut, failedCount)
 		return nil
 	default:
-		err := fmt.Errorf("invalid arg idenfier counted %v", argsId)
+		err := fmt.Errorf("invalid arg identifier counted %v", argsId)
 		checkError(err, 0, 0)
 		return err
 	}
@@ -710,7 +731,7 @@ func (a *Application) checkPrevRuntimes() error {
 	}
 
 	if len(dirListing) < 1 {
-		InfoLogger.Printf("No previous data found\n")
+		InfoLogger.Println("No previous data found")
 		a.previousRuntime = ""
 		return nil
 	}
@@ -734,6 +755,7 @@ func (a *Application) checkPrevRuntimes() error {
 				checkError(err, 1, 0)
 				continue
 			} else {
+				InfoLogger.Println("The current date and time is being used as previous runtime: " + currDateStr)
 				a.previousRuntime = currDateStr
 				return nil
 			}
@@ -759,13 +781,13 @@ func checkError(err error, errorLevel, errorCode int) {
 	fmt.Println("Error occured: ", err)
 	switch errorLevel {
 	case 0:
-		InfoLogger.Printf("test passed - error code:%v", errorCode)
+		InfoLogger.Printf("test passed - error code: %v", errorCode)
 		return
 	case 1:
-		WarningLogger.Printf("error code %v:%s", errorCode, err)
+		WarningLogger.Printf("error code: %v:%s", errorCode, err)
 		return
 	case 2:
-		ErrorLogger.Printf("error code %v:%s", errorCode, err)
+		ErrorLogger.Printf("error code: %v:%s", errorCode, err)
 		log.Fatal(err)
 	default:
 		err := fmt.Errorf("incorrect errorlevel integer: %v by errorcode: %v", errorLevel, errorCode)
@@ -844,7 +866,7 @@ func marshalURLsToMap() (map[string]string, map[string]int, error) {
 		urlStr = scanner.Text()
 		parsedURL, err := url.Parse(urlStr)
 		if err != nil {
-			io.WriteString(os.Stdout, fmt.Sprintf("Invalid URL: %s\n", urlStr))
+			checkError(err, 1, 0)
 			continue
 		}
 
@@ -862,11 +884,12 @@ func marshalURLsToMap() (map[string]string, map[string]int, error) {
 }
 
 func mkDirAndCD(date string) error {
-	if err := os.Mkdir(date, os.ModePerm); err != nil {
+	err := os.Mkdir(date, os.ModePerm)
+	if err != nil {
 		checkError(err, 1, 0)
 		return err
 	}
-	err := os.Chdir(date)
+	err = os.Chdir(date)
 	if err != nil {
 		checkError(err, 1, 0)
 		return err
