@@ -2,27 +2,23 @@ package main
 
 import (
 	"os/exec"
-	"strings"
 )
 
 // https://github.com/ChrisPritchard/ctf-writeups/blob/master/GO-SCRIPTING.md
 
 const (
-	cybernews   string = "https://www.youtube.com/@cybernews/videos"
-	seytonic    string = "https://www.youtube.com/@Seytonic/videos"
-	hakfive     string = "https://www.youtube.com/@hak5/videos"
-	firefoxCmd  string = "firefox"
-	firefoxArgs string = " --new-window"
+	firefoxCmd string = "firefox"
 )
 
 func main() {
-	urlsBuilder := strings.Builder{}
-	urlsBuilder.WriteString(firefoxArgs + " " + cybernews + " " + seytonic + " " + hakfive)
-	allUrls := urlsBuilder.String()
-
-	openAndCheckNewVideos := exec.Command(firefoxCmd, allUrls)
-	err := openAndCheckNewVideos.Run()
+	argsAndUrls := []string{"--new-window", "https://www.youtube.com/@cybernews/videos", "https://www.youtube.com/@Seytonic/videos", "https://www.youtube.com/@hak5/videos"}
+	openAndCheckNewVideos := exec.Command(firefoxCmd, argsAndUrls...)
+	err := openAndCheckNewVideos.Start()
 	if nil != err {
+		panic(err)
+	}
+	err = openAndCheckNewVideos.Wait()
+	if err != nil {
 		panic(err)
 	}
 }
