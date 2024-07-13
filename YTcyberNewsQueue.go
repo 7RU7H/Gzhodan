@@ -8,15 +8,16 @@ import (
 // https://github.com/ChrisPritchard/ctf-writeups/blob/master/GO-SCRIPTING.md
 
 const (
-	cybernews  string = "https://www.youtube.com/@cybernews/videos"
-	seytonic   string = "https://www.youtube.com/@Seytonic/videos"
-	hakfive    string = "https://www.youtube.com/@hak5/videos"
-	firefoxCmd string = "firefox --new-window "
+	cybernews   string = "https://www.youtube.com/@cybernews/videos"
+	seytonic    string = "https://www.youtube.com/@Seytonic/videos"
+	hakfive     string = "https://www.youtube.com/@hak5/videos"
+	firefoxCmd  string = "firefox"
+	firefoxArgs string = " --new-window"
 )
 
 func main() {
 	urlsBuilder := strings.Builder{}
-	urlsBuilder.WriteString(cybernews + " " + seytonic + " " + hakfive)
+	urlsBuilder.WriteString(firefoxArgs + " " + cybernews + " " + seytonic + " " + hakfive)
 	allUrls := urlsBuilder.String()
 
 	openAndCheckNewVideos := exec.Command(firefoxCmd, allUrls)
