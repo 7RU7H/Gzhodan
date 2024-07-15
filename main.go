@@ -108,7 +108,7 @@ func main() {
 	app.statistics.originalUrls = totalUrls
 	app.statistics.totalUrlsVisited += totalUrls
 
-	// Consider implecations of full implecation at some point...
+	// Consider implications of full implication at some point...
 	var defaultThreadCount int = 10
 	threadCount := defaultThreadCount
 
