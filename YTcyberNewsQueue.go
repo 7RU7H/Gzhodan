@@ -30,6 +30,9 @@ func printBanner() {
 	fmt.Fprintln(os.Stdout, "	   ░                 ░                             ")
 	fmt.Fprintln(os.Stdout, "")
 	fmt.Fprintln(os.Stdout, "Gzhodan - Goodbye AGI, APTs and Aliens (weird rapey people pretending to be many powers of the (theoretical) mathetical defintion of 'cool' than they are (No Aliens in 150 Million Lightyears btw)")
+	fmt.Fprintln(os.Stdout, "Astatical GPU Idols")
+	fmt.Fprintln(os.Stdout, "A Party of Tools")
+	fmt.Fprintln(os.Stdout, "Aliens: weird rapey people pretending to be many powers of the (theoretical) mathetical defintion of 'cool' than they actually are (No Aliens in 150 Million Lightyears btw)")
 	fmt.Fprintln(os.Stdout, "...look at you slackers, I am faster than all light in the universe itself you are all linear and boringly complete.")
 	fmt.Fprintln(os.Stdout, "💀 Happy Hacking :) ... 💀")
 }
@@ -48,7 +51,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		panic(err)
 	}
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	argsAndYouTubeCookies := []string{"--new-tab", "https://www.youtube.com/"}
 	startYouTube := exec.Command(firefoxCmd, argsAndYouTubeCookies...)
