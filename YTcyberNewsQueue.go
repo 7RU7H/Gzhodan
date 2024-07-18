@@ -35,9 +35,16 @@ func printBanner() {
 }
 
 func main() {
+	printBanner()
+
 	firefox := exec.Command(firefoxCmd)
-	err := firefox.Run()
+	err := firefox.Start()
 	if nil != err {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		panic(err)
+	}
+	err = firefox.Wait()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		panic(err)
 	}
@@ -45,20 +52,29 @@ func main() {
 
 	argsAndYouTubeCookies := []string{"--new-tab", "https://www.youtube.com/"}
 	startYouTube := exec.Command(firefoxCmd, argsAndYouTubeCookies...)
-	err = startYouTube.Run()
+	err = startYouTube.Start()
 	if nil != err {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		panic(err)
+	}
+	err = startYouTube.Wait()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		panic(err)
 	}
 	time.Sleep(5 * time.Second)
 
 	xdotoolFindFF := exec.Command(xdotoolCmd, xdtFindFirefoxAndRejectYoutube)
-	err = xdotoolFindFF.Run()
+	err = xdotoolFindFF.Start()
 	if nil != err {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		panic(err)
 	}
-
+	err = xdotoolFindFF.Wait()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		panic(err)
+	}
 	time.Sleep(1 * time.Second)
 
 	argsAndYouTubeUrls := []string{"--new-tab", "https://www.youtube.com/@cybernews/videos", "https://www.youtube.com/@Seytonic/videos", "https://www.youtube.com/@hak5/videos"}
@@ -85,7 +101,9 @@ func main() {
 	if nil != err {
 		panic(err)
 	}
+
 	time.Sleep(5 * time.Second)
+
 	err = getWrittenNewsUrls.Wait()
 	if err != nil {
 		panic(err)
