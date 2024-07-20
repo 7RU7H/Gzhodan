@@ -1,3 +1,3 @@
-module 7RU7H/Gzhodan
+module github.com/7ru7h/Gzhodan
 
-go 1.21.5
+go 1.19
