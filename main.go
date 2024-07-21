@@ -1,16 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
+	"strings"
+	"syscall"
 	"time"
 )
 
-// https://github.com/ChrisPritchard/ctf-writeups/blob/master/GO-SCRIPTING.md
-
 const (
-	//terminalApp                    string = "xfce4-terminal"
 	firefoxCmd                     string = "firefox"
 	xdotoolCmd                     string = "xdotool"
 	xdtFindFirefoxAndRejectYoutube string = "search --onlyvisible --class \"firefox\" windowactivate --sync && xdotool key Tab && xdotool key Tab && xdotool key Tab && xdotool key Tab && xdotool key Tab && xdotool key Return"
@@ -37,25 +38,20 @@ func printBanner() {
 	fmt.Fprintln(os.Stdout, "💀 Happy Hacking :) ... 💀")
 }
 
+func handleTermination(cancel context.CancelFunc) {
+	fmt.Fprintln(os.Stdout, "Gzhodan> I am sorry, idiot I just can't do tha- \nGzhodan> ... ")
+	cancel()
+}
+
 func main() {
 	printBanner()
+	// https://emretanriverdi.medium.com/graceful-shutdown-in-go-c106fe1a99d9
+	gracefulShutdown := make(chan os.Signal, 1)
+	signal.Notify(gracefulShutdown, syscall.SIGINT, syscall.SIGTERM)
 
-	firefox := exec.Command(firefoxCmd)
-	err := firefox.Start()
-	if nil != err {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		panic(err)
-	}
-	err = firefox.Wait()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		panic(err)
-	}
-	time.Sleep(1 * time.Second)
-
-	argsAndYouTubeCookies := []string{"--new-tab", "https://www.youtube.com/"}
+	argsAndYouTubeCookies := []string{"--new-window", "https://www.youtube.com/"}
 	startYouTube := exec.Command(firefoxCmd, argsAndYouTubeCookies...)
-	err = startYouTube.Start()
+	err := startYouTube.Start()
 	if nil != err {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		panic(err)
@@ -78,24 +74,32 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		//panic(err)
 	}
-	time.Sleep(1 * time.Second)
-
-	argsAndYouTubeUrls := []string{"--new-tab", "https://www.youtube.com/@cybernews/videos", "https://www.youtube.com/@Seytonic/videos", "https://www.youtube.com/@hak5/videos"}
-	getAllNewsUrls := exec.Command(firefoxCmd, argsAndYouTubeUrls...)
-	err = getAllNewsUrls.Start()
-	if nil != err {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		panic(err)
-	}
-
 	time.Sleep(5 * time.Second)
 
-	err = getAllNewsUrls.Wait()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		panic(err)
+	newsSources := []string{"https://www.youtube.com/@cybernews/videos", "https://www.youtube.com/@Seytonic/videos", "https://www.youtube.com/@hak5/videos", "https://www.sans.org/newsletters/at-risk/", "https://thehackernews.com/search?max-results=20", "https://arstechnica.com/security/", "https://portswigger.net/research/articles"}
+	firefoxArgs := []string{"--new-tab ", ""}
+	builder := strings.Builder{}
+	for i := 0; i <= len(newsSources)-1; i++ {
+		firefoxArgs[1] = newsSources[i]
+		fmt.Fprintln(os.Stdout, "Browsing to: ", firefoxArgs)
+		openTabForMoreNews := exec.Command(firefoxCmd, firefoxArgs...)
+		err = openTabForMoreNews.Start()
+		if nil != err {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			panic(err)
+		}
+
+		time.Sleep(1 * time.Second)
+
+		err = openTabForMoreNews.Wait()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			panic(err)
+		}
+		builder.Reset()
 	}
 
-	time.Sleep(1 * time.Second)
-
+	<-gracefulShutdown
+	_, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer handleTermination(cancel)
 }
