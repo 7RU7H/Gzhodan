@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	firefoxCmd                     string = "firefox"
-	xdotoolCmd                     string = "xdotool"
-	xdtFindFirefoxAndRejectYoutube string = "search --onlyvisible --class \"firefox\" windowactivate --sync && xdotool key Tab && xdotool key Tab && xdotool key Tab && xdotool key Tab && xdotool key Tab && xdotool key Return"
+	firefoxCmd string = "firefox"
+	// xdotoolCmd                     string = "xdotool"
+	bashCmd                            string = "bash"
+	cmdCxdtFindFirefoxAndRejectYoutube string = "-c 'xdotool search --onlyvisible --class \"firefox\" windowactivate --sync && xdotool key Tab && xdotool key Tab && xdotool key Tab && xdotool key Tab && xdotool key Tab && xdotool key Return'"
 )
 
 func printBanner() {
@@ -49,6 +50,10 @@ func main() {
 	gracefulShutdown := make(chan os.Signal, 1)
 	signal.Notify(gracefulShutdown, syscall.SIGINT, syscall.SIGTERM)
 
+	<-gracefulShutdown
+	_, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer handleTermination(cancel)
+
 	argsAndYouTubeCookies := []string{"--new-window", "https://www.youtube.com/"}
 	startYouTube := exec.Command(firefoxCmd, argsAndYouTubeCookies...)
 	err := startYouTube.Start()
@@ -56,32 +61,33 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		panic(err)
 	}
-	err = startYouTube.Wait()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		panic(err)
-	}
-	time.Sleep(5 * time.Second)
+	fmt.Println("Starting YouTube with Firefox")
 
-	xdotoolFindFF := exec.Command(xdotoolCmd, xdtFindFirefoxAndRejectYoutube)
+	fmt.Println("Waiting 10 seconds")
+	time.Sleep(10 * time.Second)
+	fmt.Println("Done waiting 10 seconds")
+	xdotoolFindFF := exec.Command(bashCmd, cmdCxdtFindFirefoxAndRejectYoutube)
 	err = xdotoolFindFF.Start()
 	if nil != err {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		//panic(err)
 	}
+	fmt.Println("running xdotool")
 	err = xdotoolFindFF.Wait()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		//panic(err)
 	}
+	fmt.Println("Waiting 5 seconds")
 	time.Sleep(5 * time.Second)
+	fmt.Println("Done waiting 5 seconds")
 
 	newsSources := []string{"https://www.youtube.com/@cybernews/videos", "https://www.youtube.com/@Seytonic/videos", "https://www.youtube.com/@hak5/videos", "https://www.sans.org/newsletters/at-risk/", "https://thehackernews.com/search?max-results=20", "https://arstechnica.com/security/", "https://portswigger.net/research/articles"}
-	firefoxArgs := []string{"--new-tab ", ""}
+	firefoxArgs := []string{"--new-tab", ""}
 	builder := strings.Builder{}
 	for i := 0; i <= len(newsSources)-1; i++ {
 		firefoxArgs[1] = newsSources[i]
-		fmt.Fprintln(os.Stdout, "Browsing to: ", firefoxArgs)
+		fmt.Fprintln(os.Stdout, "Browsing to: ", firefoxArgs[1])
 		openTabForMoreNews := exec.Command(firefoxCmd, firefoxArgs...)
 		err = openTabForMoreNews.Start()
 		if nil != err {
@@ -89,7 +95,9 @@ func main() {
 			panic(err)
 		}
 
+		fmt.Println("Waiting 1 seconds")
 		time.Sleep(1 * time.Second)
+		fmt.Println("Done waiting 1 seconds")
 
 		err = openTabForMoreNews.Wait()
 		if err != nil {
@@ -99,7 +107,4 @@ func main() {
 		builder.Reset()
 	}
 
-	<-gracefulShutdown
-	_, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer handleTermination(cancel)
 }
