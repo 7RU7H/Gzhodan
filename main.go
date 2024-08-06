@@ -56,6 +56,17 @@ func handleTermination(cancel context.CancelFunc) {
 	os.Exit(0)
 }
 
+func (i *appInfo) preventProcrastination() error {
+	killBrowserPID := exec.Command("kill", i.browserPID)
+	err := killBrowserPID.Start()
+	if nil != err {
+		fmt.Fprintln(os.Stderr, "Error: unable to kill the Browser PID", err)
+		panic(err)
+
+	}
+	return nil
+}
+
 func main() {
 
 	printBanner()
@@ -64,7 +75,7 @@ func main() {
 	const xdtFindBrowerAndRejectYoutubePartOne string = "xdotool search --onlyvisible --class "
 	const xdtFindBrowerAndRejectYoutubePartTwo string = " windowactivate --sync key Tab Tab Tab Tab Return"
 
-	privateBool := true
+	privateBool := false // ISSUE regarding cli there is no --new-private-tab !!
 	browsersArray := []string{"firefox", "librewolf"}
 	randomMin := 1
 	randomMax := 2
@@ -172,12 +183,7 @@ func main() {
 	defer handleTermination(cancel)
 
 	<-timer.C
-	killBrowserPID := exec.Command("kill", info.browserPID)
-	err = killBrowserPID.Start()
-	if nil != err {
-		fmt.Fprintln(os.Stderr, "Error: unable to kill the Browser PID", err)
-		panic(err)
-	}
+	defer info.preventProcrastination()
 	os.Exit(0)
 }
 
