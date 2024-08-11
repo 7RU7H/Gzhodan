@@ -4,6 +4,9 @@ Gzhodan is the G*-olang-*zombified Hyper-Optimized Daily Aggregating Newsreporte
 
 > *A life without butter is no life at all*. - Marco Pierre White
 
+For continious development and flavouring for my own personal amusement a warning that this project will include pushs that are breaking changes without releasing anything. Without saying RTFM or laern linux or even I do not care... If this concept is upsetting for you reviewing, using and hacking this code, then tough. GitHub Private Repository branches are enumeratable with hashes easily obtained by any individual that really wants to get that sweet disclosure and access. So no development forks, release binaries, breaking source code will be here for the sake for free real-est...storage, so if for whatever reason this is reviewed as stardand of my work and then sadly supply-chain attacks cost companies less than I am worth. Move along, nothing to see here, have a great day :)!   
+
+
 #### Installation
 
 For the purposes of which this is designed for, it is best to do as follows for a variety of implied reasons:

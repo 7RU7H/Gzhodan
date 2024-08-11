@@ -78,7 +78,7 @@ func (info *gzhodanInfo) openAllUrlsInbrowser() error {
 		err = openTabForMoreNews.Wait()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error:", err)
-			fmt.Fprintf(os.Stdout, "Unable complete execution of `%s --new-tab %s`\n", info.browser, browserArgs[1])
+			fmt.Fprintf(os.Stdout, "Unable to complete execution of `%s --new-tab %s`\n", info.browser, browserArgs[1])
 			panic(err)
 		}
 		builder.Reset()
@@ -87,54 +87,75 @@ func (info *gzhodanInfo) openAllUrlsInbrowser() error {
 }
 
 func (info *gzhodanInfo) openAllUrlsInPrivateBrowser() error {
-	const xdotoolBinary string = "xdotool"
-	const xdotoolFindPrivateBrowserWindowArgs string = ""
-	const xdotoolNewPrivateBrowserTabArgs string = ""
-	const xdotoolTargetUrlBarArgs string = ""
-	const xdotoolKeyReturn string = ""
-	xdotoolTypeURLCmdAndArgs := ""
+	const xdotoolSearch string = "xdotool search --onlyvisible --class "
+	const xdotoolWindowActivateArg string = " windowactivate"
+	const xdotoolNewTabKeysArg string = " --sync key --clearmodifiers ctrl+t"
+	const xdotoolTargetUrlBarArgs string = " --sync key --clearmodifiers ctrl+l"
+	const xdotoolKeyReturnArgs string = " --sync key Return"
 	builder := strings.Builder{}
-
-	builder.WriteString(xdotoolFindPrivateBrowserWindowArgs)
-	builder.Write()
-	xdtFindSpecificBrowserArgs := builder.String()
+	builder.WriteString(xdotoolSearch)
+	builder.WriteString(info.browser)
+	builder.WriteString(xdotoolWindowActivateArg)
+	xdtFindSpecificBrowserArgs, xdtPressEnterArgs, xdtOpenNewPrivateTabArgs, xdotoolTypeURLCmdAndArgs := builder.String(), builder.String(), builder.String(), builder.String()
+	builder.WriteString(xdotoolTargetUrlBarArgs)
+	xdtTargetUrlBarArgs := builder.String()
 	builder.Reset()
-	for i := 0; i <= len(info.newsSources)-1; i++ {
-		// grab browser window
+	xdtPressEnterArgs = xdtPressEnterArgs + xdotoolKeyReturnArgs
+	xdtOpenNewPrivateTabArgs = xdtOpenNewPrivateTabArgs + xdotoolNewTabKeysArg
+	xdotoolTypeURLCmdAndArgs = xdotoolTypeURLCmdAndArgs + " type "
+	builder.Reset()
 
+	for i := 0; i <= len(info.newsSources)-1; i++ {
 		fmt.Fprintf(os.Stdout, "xdotool searching for browser:browser PID: %s:%s\n", info.browser, info.browserPID)
-		xdtFindPrivateBrowserCmd := exec.Command(xdotoolBinary, xdtFindSpecificBrowserArgs)
+		xdtFindPrivateBrowserCmd := exec.Command("/bin/bash", "-c", xdtFindSpecificBrowserArgs)
 		err := xdtFindPrivateBrowserCmd.Start()
 		if nil != err {
 			fmt.Fprintf(os.Stdout, "Only %v urls accounted for...\n", i-len(info.newsSources))
 			fmt.Fprintln(os.Stderr, "Error:", err)
-			fmt.Fprintf(os.Stdout, "Unable to execute `%s %s`\n", xdotoolBinary, xdtFindSpecificBrowserArgs)
+			fmt.Fprintf(os.Stdout, "Unable to execute `%s %s`\n", "/bin/bash -c", xdtFindSpecificBrowserArgs)
 			panic(err)
 		}
 		err = xdtFindPrivateBrowserCmd.Wait()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error:", err)
-			fmt.Fprintf(os.Stdout, "Unable complete execution of `%s %s`\n")
+			fmt.Fprintf(os.Stdout, "Unable to complete execution of `%s %s`\n", "/bin/bash -c", xdtFindSpecificBrowserArgs)
 			panic(err)
 		}
+		fmt.Fprintf(os.Stdout, "xdotool found the %s browser", info.browser)
 
-		fmt.Fprintf(os.Stdout, "")
-		// ctrl tab for new tab
-		fmt.Fprintf(os.Stdout, "Browsing to: %s\n", info.newsSources[i])
-		xdtTypeURLintoBrowser := exec.Command(xdotoolBinary, xdotoolTypeUrlArgs)
-		err = xdtTypeURLintoBrowser.Start()
+		fmt.Fprintf(os.Stdout, "xdotool opening a new browser tab for url number %v : %s\n", i, info.newsSources[i])
+		xdtOpenNewPrivateTab := exec.Command("/bin/bash", "-c", xdtOpenNewPrivateTabArgs)
+		err = xdtOpenNewPrivateTab.Start()
 		if nil != err {
 			fmt.Fprintf(os.Stdout, "Only %v urls accounted for...\n", i-len(info.newsSources))
 			fmt.Fprintln(os.Stderr, "Error:", err)
-			fmt.Fprintf(os.Stdout, "Unable to execute `%s %s`\n", xdotoolBinary, xdotoolTypeUrlArgs)
+			fmt.Fprintf(os.Stdout, "Unable to execute `%s %s`\n", "/bin/bash -c", xdtOpenNewPrivateTabArgs)
 			panic(err)
 		}
-		err = xdtTypeURLintoBrowser.Wait()
+		err = xdtOpenNewPrivateTab.Wait()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error:", err)
-			fmt.Fprintf(os.Stdout, "Unable complete execution of `%s %s`\n", xdotoolBinary, xdotoolTypeUrlArgs)
+			fmt.Fprintf(os.Stdout, "Unable to complete execution of `%s %s`\n", "/bin/bash -c", xdtOpenNewPrivateTabArgs)
 			panic(err)
 		}
+		fmt.Fprintf(os.Stdout, "xdotool opened a new tab for the browser for url number %v : %s\n", i, info.newsSources[i])
+
+		fmt.Fprintf(os.Stdout, "xdotool focusing on URL bar for the new browser tab for url number %v : %s\n", i, info.newsSources[i])
+		xdtFocusOnUrlBarInNewTab := exec.Command("/bin/bash", "-c", xdtTargetUrlBarArgs)
+		err = xdtOpenNewPrivateTab.Start()
+		if nil != err {
+			fmt.Fprintf(os.Stdout, "Only %v urls accounted for...\n", i-len(info.newsSources))
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			fmt.Fprintf(os.Stdout, "Unable to execute `%s %s`\n", "/bin/bash -c", xdtTargetUrlBarArgs)
+			panic(err)
+		}
+		err = xdtFocusOnUrlBarInNewTab.Wait()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			fmt.Fprintf(os.Stdout, "Unable to complete execution of `%s %s`\n", "/bin/bash -c", xdtTargetUrlBarArgs)
+			panic(err)
+		}
+		fmt.Fprintf(os.Stdout, "xdotool is now focused on URL bar for browser for url number %v : %s\n", i, info.newsSources[i])
 
 		builder.WriteString(xdotoolTypeURLCmdAndArgs)
 		builder.WriteString(info.newsSources[i])
@@ -142,24 +163,43 @@ func (info *gzhodanInfo) openAllUrlsInPrivateBrowser() error {
 		builder.Reset()
 
 		fmt.Fprintf(os.Stdout, "Browsing to: %s\n", info.newsSources[i])
-		xdtTypeURLintoBrowser := exec.Command(xdotoolBinary, xdotoolTypeUrlArgs)
-		err := xdtTypeURLintoBrowser.Start()
+
+		fmt.Fprintf(os.Stdout, "xdotool executing: %s\n", xdotoolTypeUrlArgs)
+		xdtTypeURLintoBrowser := exec.Command("/bin/bash", "-c", xdotoolTypeUrlArgs)
+		err = xdtTypeURLintoBrowser.Start()
 		if nil != err {
 			fmt.Fprintf(os.Stdout, "Only %v urls accounted for...\n", i-len(info.newsSources))
 			fmt.Fprintln(os.Stderr, "Error:", err)
-			fmt.Fprintf(os.Stdout, "Unable to execute `%s %s`\n", xdotoolBinary, xdotoolTypeUrlArgs)
+			fmt.Fprintf(os.Stdout, "Unable to execute `%s %s`\n", "/bin/bash -c", xdotoolTypeUrlArgs)
 			panic(err)
 		}
 		err = xdtTypeURLintoBrowser.Wait()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error:", err)
-			fmt.Fprintf(os.Stdout, "Unable complete execution of `%s %s`\n", xdotoolBinary, xdotoolTypeUrlArgs)
+			fmt.Fprintf(os.Stdout, "Unable to complete execution of `%s %s`\n", "/bin/bash -c", xdotoolTypeUrlArgs)
 			panic(err)
 		}
+
 		printJibberish(19)
 		time.Sleep(1 * time.Second)
 		printJibberish(20)
-		// return key
+
+		fmt.Fprintf(os.Stdout, "xdotool pressing enter with: %s\n", xdtPressEnterArgs)
+		xdtPressEnterToBrowserToURL := exec.Command("/bin/bash", "-c", xdtPressEnterArgs)
+		err = xdtPressEnterToBrowserToURL.Start()
+		if nil != err {
+			fmt.Fprintf(os.Stdout, "Only %v urls accounted for...\n", i-len(info.newsSources))
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			fmt.Fprintf(os.Stdout, "Unable to execute `%s %s`\n", "/bin/bash -c", xdtPressEnterArgs)
+			panic(err)
+		}
+		err = xdtPressEnterToBrowserToURL.Wait()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			fmt.Fprintf(os.Stdout, "Unable to complete execution of `%s %s`\n", "/bin/bash -c", xdtPressEnterArgs)
+			panic(err)
+		}
+
 		printJibberish(9)
 		time.Sleep(1 * time.Second)
 		printJibberish(10)
@@ -168,13 +208,8 @@ func (info *gzhodanInfo) openAllUrlsInPrivateBrowser() error {
 	return nil
 }
 
-// Add a check for internet connectivity
-
 // Kill process termination and graceful exit
 // Does work, but does not exit after an 1 hour, but will Ctrl+C after an hour
-
-// If private open private-window use a CTRL+T open new tab with xdotools
-// Check brave browser hotkeys
 
 // VERY HELPFUL:
 // https://manpages.ubuntu.com/manpages/bionic/en/man1/xdotool.1.html#window%20commands
@@ -232,11 +267,12 @@ func main() {
 	info.newsSources = []string{"https://www.youtube.com/@cybernews/videos", "https://www.youtube.com/@Seytonic/videos", "https://www.youtube.com/@hak5/videos", "https://www.sans.org/newsletters/at-risk/", "https://thehackernews.com/search?max-results=20", "https://arstechnica.com/security/", "https://danielmiessler.com/", "https://portswigger.net/research/articles"}
 
 	printBanner()
+	printJibberish(21)
 
 	if randomiseBrowserBool {
 		printJibberish(19)
 		info.randomiseBrowser(browsersArray)
-	} else { //flag needs adding
+	} else {
 		info.browser = "firefox"
 	}
 
@@ -301,10 +337,8 @@ func main() {
 		printJibberish(4)
 
 		printJibberish(7)
-		fmt.Fprintf(os.Stdout, "Waiting 5 seconds - did you know that only the finest potatos are used in the upcoming release of Gzhados\n")
 		time.Sleep(5 * time.Second)
 		printJibberish(8)
-		fmt.Fprintf(os.Stdout, "Done waiting 5 seconds, beginning to browser to YouTube Channels and News sites, AI Joe dedicated to Real Joe - LMAO\n")
 
 		info.openAllUrlsInbrowser()
 
@@ -328,29 +362,29 @@ func main() {
 func printJibberish(jibberID int) {
 	switch jibberID {
 	case 0:
-		fmt.Fprintf(os.Stdout, "f0936e3af2b30a378bef2d0549d722a50fe62543fc3c460690f902d40c3583b820b21034874d910e808ce637acf74387a43419c657b654f04e66e3b356a66eaa864704d504917bebc88297b9107f7b84d3bd6a13f02c5f4ed065ea0029f131aa27903a688166ea480c9fbbf8c2e36cc3d8c901bd277632417a9b2e8a48c3df33c070a10701c08407438366a119cdcae4ca7078407ee935445949cf1836bffd5375586c82e13f1ffeb40ee8a8125fdc2ddd05187c2f9ac8cd4dd6ee38e9d23b4b\n")
+		fmt.Fprintln(os.Stdout, "f0936e3af2b30a378bef2d0549d722a50fe62543fc3c460690f902d40c3583b820b21034874d910e808ce637acf74387a43419c657b654f04e66e3b356a66eaa864704d504917bebc88297b9107f7b84d3bd6a13f02c5f4ed065ea0029f131aa27903a688166ea480c9fbbf8c2e36cc3d8c901bd277632417a9b2e8a48c3df33c070a10701c08407438366a119cdcae4ca7078407ee935445949cf1836bffd5375586c82e13f1ffeb40ee8a8125fdc2ddd05187c2f9ac8cd4dd6ee38e9d23b4b")
 	case 1:
-		fmt.Fprintf(os.Stdout, "Status!.. I don't know the CODES! Don't Give me excuses give me results! Navigation... ...\n")
+		fmt.Fprintln(os.Stdout, "Status!.. I don't know the CODES! Don't Give me excuses give me results! Navigation... ...")
 	case 2:
-		fmt.Fprintf(os.Stdout, "Waiting 10 seconds, because executing through golang process takes longer and xdotool needs the time..\n")
+		fmt.Fprintln(os.Stdout, "Waiting 10 seconds, because executing through golang process takes longer and xdotool needs the time..")
 	case 3:
-		fmt.Fprintf(os.Stdout, ".. You forgot to light the FUSE Gzhomit..don't look doooooooooooooooooown that alley!\n")
+		fmt.Fprintln(os.Stdout, ".. You forgot to light the FUSE Gzhomit..don't look doooooooooooooooooown that alley!")
 	case 4:
-		fmt.Fprintf(os.Stdout, "Done waiting 10 seconds, *microwave* ping sound - no explosions ... aaaaah ...\n")
+		fmt.Fprintln(os.Stdout, "Done waiting 10 seconds, *microwave* ping sound - no explosions ... aaaaah ...")
 	case 5:
-		fmt.Fprintf(os.Stdout, "You got the WRONG CLOUSERS..Gzhomit\n")
+		fmt.Fprintln(os.Stdout, "You got the WRONG CLOUSERS..Gzhomit")
 	case 6:
-		fmt.Fprintf(os.Stdout, "Loop-da-looping the cables to 2000m nose drive drop - (Tabbing through YouTube cookies to reject them with xdotool)\n")
+		fmt.Fprintln(os.Stdout, "Loop-da-looping the cables to 2000m nose drive drop - (Tabbing through YouTube cookies to reject them with xdotool)")
 	case 7:
-		fmt.Fprintf(os.Stdout, "Waiting 5 seconds - did you know that only the finest potatos are used in the upcoming release of Gzhados\n")
+		fmt.Fprintln(os.Stdout, "Waiting 5 seconds - did you know that only the finest potatos are used in the upcoming release of Gzhados")
 	case 8:
-		fmt.Fprintf(os.Stdout, "Done waiting 5 seconds, beginning to browser to YouTube Channels and News sites, AI Joe dedicated to Real Joe - LMAO\n")
+		fmt.Fprintln(os.Stdout, "Done waiting 5 seconds, beginning to browser to YouTube Channels and News sites, AI Joe dedicated to Real Joe - LMAO")
 	case 9:
-		fmt.Fprintf(os.Stdout, "Steady on single file ... Waiting 1 seconds\n")
+		fmt.Fprintln(os.Stdout, "Steady on single file ... Waiting 1 seconds")
 	case 10:
-		fmt.Fprintf(os.Stdout, "Done waiting 1 seconds, remember the answer follows the question, its dangerous if it goes the other way...\n")
+		fmt.Fprintln(os.Stdout, "Done waiting 1 seconds, remember the answer follows the question, its dangerous if it goes the other way...")
 	case 11:
-		fmt.Fprintf(os.Stdout, "Steady on single file I said\n")
+		fmt.Fprintln(os.Stdout, "Steady on single file I said")
 	case 12:
 		fmt.Fprintln(os.Stdout, "Great, but not bad... there will questions and explaination for centuries ... remember who you are talking too all knowing, all seeing...hmmmm")
 	case 13:
@@ -369,6 +403,8 @@ func printJibberish(jibberID int) {
 		fmt.Fprintln(os.Stdout, "CAWLing a Cawl to Cawl")
 	case 20:
 		fmt.Fprintln(os.Stdout, "FEATURE CREEP CONFIRMED!")
+	case 21:
+		fmt.Fprintln(os.Stdout, "Good news everyone!")
 	case -1:
 		fmt.Fprintln(os.Stdout, "aHR0cHM6Ly9nY2hxLmdpdGh1Yi5pby9DeWJlckNoZWYvI3JlY2lwZT1Gcm9tX0Jhc2U2NCgnQS1aYS16MC05JTJCLyUzRCcsdHJ1ZSxmYWxzZSlGcm9tX0hleCgnQXV0bycpWE9SKCU3QidvcHRpb24nOidIZXgnLCdzdHJpbmcnOidEZWVzJyU3RCwnU3RhbmRhcmQnLGZhbHNlKUFFU19EZWNyeXB0KCU3QidvcHRpb24nOidVVEY4Jywnc3RyaW5nJzonTnV0cy4uLi4uLi4uLi4uLiclN0QsJTdCJ29wdGlvbic6J1VURjgnLCdzdHJpbmcnOidHb3R0ZW1HT1RURU1MTUFPJyU3RCwnQ0JDJywnSGV4JywnUmF3JywlN0Inb3B0aW9uJzonSGV4Jywnc3RyaW5nJzonJyU3RCwlN0Inb3B0aW9uJzonSGV4Jywnc3RyaW5nJzonJyU3RCk=")
 	}
