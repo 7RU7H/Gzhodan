@@ -294,17 +294,17 @@ func main() {
 			fmt.Fprintln(os.Stderr, "Error: browser could not open to Youtube", err)
 			panic(err)
 		}
+		printJibberish(2)
+		time.Sleep(5 * time.Second)
+		printJibberish(3)
 		info.browserPID = strconv.Itoa(startYouTube.Process.Pid)
+		time.Sleep(5 * time.Second)
+		printJibberish(4)
 		err = info.findBrowserAndRejectYouTubeCookies()
 		if nil != err {
 			fmt.Fprintln(os.Stderr, "Error: could not reject YouTube cookies", err)
 			panic(err)
 		}
-		printJibberish(2)
-		time.Sleep(5 * time.Second)
-		printJibberish(3)
-		time.Sleep(5 * time.Second)
-		printJibberish(4)
 
 		info.openAllUrlsInPrivateBrowser()
 
@@ -323,18 +323,17 @@ func main() {
 			fmt.Fprintln(os.Stderr, "Error: browser could not open to Youtube", err)
 			panic(err)
 		}
+		printJibberish(2)
+		time.Sleep(5 * time.Second)
+		printJibberish(3)
 		info.browserPID = strconv.Itoa(startYouTube.Process.Pid)
+		time.Sleep(5 * time.Second)
+		printJibberish(4)
 		err = info.findBrowserAndRejectYouTubeCookies()
 		if nil != err {
 			fmt.Fprintln(os.Stderr, "Error: could not reject YouTube cookies", err)
 			panic(err)
 		}
-
-		printJibberish(2)
-		time.Sleep(5 * time.Second)
-		printJibberish(3)
-		time.Sleep(5 * time.Second)
-		printJibberish(4)
 
 		printJibberish(7)
 		time.Sleep(5 * time.Second)
