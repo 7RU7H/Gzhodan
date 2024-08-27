@@ -19,17 +19,16 @@ type gzhodanInfo struct {
 	newsSources []string
 }
 
-func (info *gzhodanInfo) preventProcrastination() error {
-	killBrowserPID := exec.Command("kill", "-s SIGTERM", info.browserPID)
-	err := killBrowserPID.Start()
-	if nil != err {
-		fmt.Fprintln(os.Stderr, "Error: unable to kill the Browser PID", err)
-		panic(err)
-
-	}
-	printJibberish(17)
-	return nil
-}
+// func (info *gzhodanInfo) preventProcrastination() error {
+//	killBrowserPID := exec.Command("kill", "-s SIGTERM", info.browserPID)
+// 	err := killBrowserPID.Start()
+//	if nil != err {
+//		fmt.Fprintln(os.Stderr, "Error: unable to kill the Browser PID", err)
+//		panic(err)
+//	}
+//	printJibberish(17)
+//	return nil
+//}
 
 func (info *gzhodanInfo) randomiseBrowser(browsersArray []string) {
 	randomMin := 1
@@ -282,7 +281,7 @@ func main() {
 	// https://emretanriverdi.medium.com/graceful-shutdown-in-go-c106fe1a99d9
 	gracefulShutdown := make(chan os.Signal, 1)
 	signal.Notify(gracefulShutdown, syscall.SIGINT, syscall.SIGTERM)
-	timer := time.NewTimer(1 * time.Hour)
+	//timer := time.NewTimer(1 * time.Hour)
 
 	printJibberish(1)
 
@@ -349,12 +348,13 @@ func main() {
 		printJibberish(16)
 	}
 
+	//	<-timer.C
+	//	defer info.preventProcrastination()
+
 	<-gracefulShutdown
 	_, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer handleTermination(cancel)
 
-	<-timer.C
-	defer info.preventProcrastination()
 	os.Exit(0)
 }
 
