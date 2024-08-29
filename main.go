@@ -263,7 +263,7 @@ func main() {
 	info := gzhodanInfo{}
 	privateBool := false // ISSUE regarding cli there is no --new-private-tab !!
 	randomiseBrowserBool := false
-	info.newsSources = []string{"https://www.youtube.com/@cybernews/videos", "https://www.youtube.com/@Seytonic/videos", "https://www.youtube.com/@hak5/videos", "https://www.sans.org/newsletters/at-risk/", "https://thehackernews.com/search?max-results=20", "https://arstechnica.com/security/", "https://danielmiessler.com/", "https://portswigger.net/research/articles"}
+	info.newsSources = []string{"https://www.youtube.com/@cybernews/videos", "https://www.youtube.com/@Seytonic/videos", "https://www.youtube.com/@hak5/videos", "https://www.sans.org/newsletters/at-risk/", "https://thehackernews.com/search?max-results=20", "https://arstechnica.com/security/", "https://danielmiessler.com/", "https://portswigger.net/research/articles", "https://hackread.com/", "https://news.risky.biz/"}
 
 	printBanner()
 	printJibberish(21)

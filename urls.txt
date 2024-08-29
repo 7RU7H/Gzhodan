@@ -6,3 +6,5 @@ https://thehackernews.com/search?max-results=20
 https://arstechnica.com/security/
 https://portswigger.net/research/articles
 https://danielmiessler.com/rm
+https://hackread.com/
+https://news.risky.biz/
