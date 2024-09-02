@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"math/rand"
 	"os"
@@ -14,9 +15,11 @@ import (
 )
 
 type gzhodanInfo struct {
-	browser     string
-	browserPID  string
-	newsSources []string
+	args             map[string]string
+	browser          string
+	browserPID       string
+	possibleBrowsers []string
+	newsSources      []string
 }
 
 // func (info *gzhodanInfo) preventProcrastination() error {
@@ -30,11 +33,11 @@ type gzhodanInfo struct {
 //	return nil
 //}
 
-func (info *gzhodanInfo) randomiseBrowser(browsersArray []string) {
+func (info *gzhodanInfo) randomiseBrowser() {
 	randomMin := 1
-	randomMax := len(browsersArray)
+	randomMax := len(info.possibleBrowsers)
 	randBrowserChoice := rand.Intn(randomMax-randomMin) + randomMin
-	info.browser = browsersArray[randBrowserChoice]
+	info.browser = info.possibleBrowsers[randBrowserChoice]
 }
 
 func (info *gzhodanInfo) findBrowserAndRejectYouTubeCookies() error {
@@ -91,6 +94,7 @@ func (info *gzhodanInfo) openAllUrlsInPrivateBrowser() error {
 	const xdotoolNewTabKeysArg string = " --sync key --clearmodifiers ctrl+t"
 	const xdotoolTargetUrlBarArgs string = " --sync key --clearmodifiers ctrl+l"
 	const xdotoolKeyReturnArgs string = " --sync key Return"
+
 	builder := strings.Builder{}
 	builder.WriteString(xdotoolSearch)
 	builder.WriteString(info.browser)
@@ -257,20 +261,79 @@ func handleTermination(cancel context.CancelFunc) {
 	os.Exit(0)
 }
 
-func main() {
-	browsersArray := []string{"debug", "firefox", "librewolf"}
+// Consider a strictness flag - pretty sure i found stdlib code that does this but consider being more strict and how
+// func validateUrls([]string) {}
 
+func (info *gzhodanInfo) parseArgs(userArgs []string) error {
+	for i := 0; i <= len(userArgs)-1; i++ {
+		switch userArgs[i] {
+		case "-u":
+			info.args["u"] = userArgs[i+1]
+		case "-U":
+			info.args["U"] = userArgs[i+1]
+		}
+		// switch by flag and map to info.args
+	}
+	// -b browser - validBrowser, randomiseBrowser, default
+
+	defaultNewsSources := []string{"https://www.youtube.com/@cybernews/videos", "https://www.youtube.com/@Seytonic/videos", "https://www.youtube.com/@hak5/videos", "https://www.sans.org/newsletters/at-risk/", "https://thehackernews.com/search?max-results=20", "https://arstechnica.com/security/", "https://danielmiessler.com/", "https://portswigger.net/research/articles", "https://hackread.com/", "https://news.risky.biz/"}
+	if info.args["u"] != "" && info.args["U"] != "" {
+		// combining both url flags is not supported, use the capitalised flag for combining a urls.txt file with default list
+		return err
+	}
+	if info.args["u"] != "" {
+		urlsFromFile := readFileToArray()
+		// validateUrls(urlsFromFile)
+		info.newsSources = urlsFromFile
+	} else if info.args["U"] != "" {
+		urlsFromFile := readFileToArray()
+		// validateUrls(urlsFromFile)
+		info.newsSources = appendUrlsToDefault(defaultNewsSources, urlsFromFile)
+
+	} else {
+		info.newsSources = defaultNewsSources
+	}
+
+	// -q quiet the jibberish
+	// -p private
+	// -H "" is false if not "" print extra help
+	return nil
+}
+
+func main() {
 	info := gzhodanInfo{}
-	privateBool := false // ISSUE regarding cli there is no --new-private-tab !!
-	randomiseBrowserBool := false
-	info.newsSources = []string{"https://www.youtube.com/@cybernews/videos", "https://www.youtube.com/@Seytonic/videos", "https://www.youtube.com/@hak5/videos", "https://www.sans.org/newsletters/at-risk/", "https://thehackernews.com/search?max-results=20", "https://arstechnica.com/security/", "https://danielmiessler.com/", "https://portswigger.net/research/articles", "https://hackread.com/", "https://news.risky.biz/"}
+	info.args = make(map[string]string)
+	info.args["u"], info.args["U"] = "", "" // info.args[""]
+	info.possibleBrowsers = []string{"debug", "firefox", "librewolf"}
+
+	// https://gobyexample.com/command-line-flags
+	// pass *vars to parseArgs(), which I have done, but i freaks from apparently its nasty comment given - function should not have too many args F# guy unix like
+
+	// with map control flow is done via the flags as a key value - which is inherently boolaen like AND still two pointer close to one another AND not have worry about pointers to weird memory - we are more secure by write "" into a place
+
+	// Variables from scaffold future updates
+	privateBool := false          // ISSUE regarding cli there is no --new-private-tab !!
+	randomiseBrowserBool := false // deal with when add -b
+
+	var urlFilePathArg string
+	flag.StringVar(&urlFilePathArg, "-U", "", "Append urls .txt file containing a list urls one per line to the default urls; -H for default urls")
+	flag.StringVar(&urlFilePathArg, "-u", "", "Provide .txt file containing a list urls one per line; -H for default urls")
+	flag.Parse()
+	args := flag.Args()
 
 	printBanner()
+
+	err := info.parseArgs(args)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error: Unable to parse CLI arguments", err)
+		panic(err)
+	}
+
 	printJibberish(21)
 
 	if randomiseBrowserBool {
 		printJibberish(19)
-		info.randomiseBrowser(browsersArray)
+		info.randomiseBrowser()
 	} else {
 		info.browser = "firefox"
 	}
