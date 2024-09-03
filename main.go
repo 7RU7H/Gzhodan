@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -15,11 +16,14 @@ import (
 )
 
 type gzhodanInfo struct {
-	args             map[string]string
-	browser          string
-	browserPID       string
-	possibleBrowsers []string
-	newsSources      []string
+	args               map[string]string // is this a visibility issue by abstraction really?
+	browser            string
+	browserPID         string
+	randomBrowserBool  bool
+	privateBrowsing    bool
+	possibleBrowsers   []string
+	newsSources        []string
+	defaultNewsSources []string
 }
 
 // func (info *gzhodanInfo) preventProcrastination() error {
@@ -64,6 +68,9 @@ func (info *gzhodanInfo) openAllUrlsInbrowser() error {
 	browserArgs := []string{"--new-tab", ""}
 	builder := strings.Builder{}
 	for i := 0; i <= len(info.newsSources)-1; i++ {
+		if info.newsSources[i] == "" {
+			break
+		}
 		browserArgs[1] = info.newsSources[i]
 		fmt.Fprintf(os.Stdout, "Browsing to: %s\n", browserArgs[1])
 		openTabForMoreNews := exec.Command(info.browser, browserArgs...)
@@ -109,6 +116,9 @@ func (info *gzhodanInfo) openAllUrlsInPrivateBrowser() error {
 	builder.Reset()
 
 	for i := 0; i <= len(info.newsSources)-1; i++ {
+		if info.newsSources[i] == "" {
+			break
+		}
 		fmt.Fprintf(os.Stdout, "xdotool searching for browser:browser PID: %s:%s\n", info.browser, info.browserPID)
 		xdtFindPrivateBrowserCmd := exec.Command("/bin/bash", "-c", xdtFindSpecificBrowserArgs)
 		err := xdtFindPrivateBrowserCmd.Start()
@@ -232,7 +242,7 @@ func printBanner() {
 	fmt.Fprintln(os.Stdout, "      ░   ░ ░     ░  ░  ░    ░ ░     ░          ░  ░         ░ ")
 	fmt.Fprintln(os.Stdout, "        ░                          ░                           ")
 	fmt.Fprintln(os.Stdout, "")
-	fmt.Fprintln(os.Stdout, "================================================================")
+	fmt.Fprintln(os.Stdout, "===============================================================")
 	fmt.Fprintln(os.Stdout, "Gzhodan - Goodbye AGI, APTs and Aliens; a Secret tunnel...")
 	fmt.Fprintln(os.Stdout, "Secret tunnel...Secret tunnel...Secret, Secret TUUUNNNEELLL!")
 	fmt.Fprintln(os.Stdout, "Astatical GPU Idols")
@@ -250,7 +260,7 @@ func printBanner() {
 	fmt.Fprintln(os.Stdout, "...look at you slackers, I am faster than all light in the universe itself you are all linear and boringly complete.")
 	fmt.Fprintln(os.Stdout, "")
 	fmt.Fprintln(os.Stdout, "Only avalible on all good penguin operating systems, no red rubber gloves")
-	fmt.Fprintln(os.Stdout, "Version 1.8532110112358")
+	fmt.Fprintln(os.Stdout, "Version 2.71828...0001")
 	fmt.Fprintln(os.Stdout, "💀 Happy Hacking :) ... 💀")
 }
 
@@ -261,82 +271,146 @@ func handleTermination(cancel context.CancelFunc) {
 	os.Exit(0)
 }
 
-// Consider a strictness flag - pretty sure i found stdlib code that does this but consider being more strict and how
-// func validateUrls([]string) {}
-
-func (info *gzhodanInfo) parseArgs(userArgs []string) error {
-	for i := 0; i <= len(userArgs)-1; i++ {
-		switch userArgs[i] {
-		case "-u":
-			info.args["u"] = userArgs[i+1]
-		case "-U":
-			info.args["U"] = userArgs[i+1]
-		}
-		// switch by flag and map to info.args
+func readFileToArray(path string) ([]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		panic(err)
 	}
-	// -b browser - validBrowser, randomiseBrowser, default
+	return strings.Split(string(data), "\n"), nil
+}
 
-	defaultNewsSources := []string{"https://www.youtube.com/@cybernews/videos", "https://www.youtube.com/@Seytonic/videos", "https://www.youtube.com/@hak5/videos", "https://www.sans.org/newsletters/at-risk/", "https://thehackernews.com/search?max-results=20", "https://arstechnica.com/security/", "https://danielmiessler.com/", "https://portswigger.net/research/articles", "https://hackread.com/", "https://news.risky.biz/"}
+// Consider a strictness flag - pretty sure i found stdlib code that does this but consider being more strict and how
+// error is still return type for not knowing the effect of all the possible control characters
+func validateUrls(urls []string) ([]string, error) {
+	validUrls := []string{}
+	httpsRegex := regexp.MustCompile(`https://`)
+	for i,url := range urls {
+		switch url {
+			case "":
+				err := fmt.Errorf("file line containing nothing found in the urls of user provided file at index %v", i)
+				fmt.Fprintln(os.Stderr, "Error:", err)
+				printJibberish(-1)
+			case "\n":
+				err := fmt.Errorf("newline character found in the urls of user provided file at index %v", i)
+				fmt.Fprintln(os.Stderr, "Error:", err)
+				printJibberish(-1)
+
+			case "\r":
+				err := fmt.Errorf("return character found in the urls of user provided file at index %v", i)
+				fmt.Fprintln(os.Stderr, "Error:", err)
+				printJibberish(-1)
+			case "\t":
+				err := fmt.Errorf("tab character found in the urls of user provided file at index %v", i)
+				fmt.Fprintln(os.Stderr, "Error:", err)
+				printJibberish(-1)
+			default:
+				matchHttps, err := regexp.MatchString(httpsRegex.String(), url)
+				if err != nil {
+					panic(err)
+				}
+				if matchHttps {
+					validUrls = append(validUrls, url)
+				} else {
+					err := fmt.Errorf("failed to match the url: %s at index: %v, with a regexp: http://", url, i)
+					fmt.Fprintln(os.Stderr, "Error:", err)
+					printJibberish(-1)				
+				}
+
+		}
+	}
+	return validUrls, nil
+}
+
+// consider relative and absolute and $PATH paths
+// func (info *gzhodanInfo) validateBrowser() error {}
+
+
+// private browser does not need to be checked and can be cross check by control flow as requires entirely different flow
+func (info *gzhodanInfo) parseArgs() error {
+	if info.args["b"] != "" && strings.Contains(info.args["b"], "random") {
+		if info.args["b"] == "random" {
+			info.randomiseBrowser()
+			printJibberish(19)
+			info.randomBrowserBool = true
+		}
+		if strings.Contains(info.args["b"], "random.txt") {
+			info.possibleBrowsers, _ = readFileToArray(info.args["b"])
+			info.randomiseBrowser()
+			printJibberish(19)
+			info.randomBrowserBool = true
+		}
+	} else {
+		info.browser = info.args["b"]
+	}
+	//info.validateBrowser()
+
 	if info.args["u"] != "" && info.args["U"] != "" {
-		// combining both url flags is not supported, use the capitalised flag for combining a urls.txt file with default list
+		err := fmt.Errorf("combining both url flags is not supported, use the capitalised flag for combining a urls.txt file with default list; arguments u:%s and capitalise u: %s", info.args["u"], info.args["U"])
+		fmt.Fprintln(os.Stderr, "Error:", err)
 		return err
 	}
 	if info.args["u"] != "" {
-		urlsFromFile := readFileToArray()
-		// validateUrls(urlsFromFile)
+		urlsFromFile, err := readFileToArray(info.args["u"])
+		if err != nil {
+			panic(err)
+		}
+		validateUrls(urlsFromFile)
 		info.newsSources = urlsFromFile
 	} else if info.args["U"] != "" {
-		urlsFromFile := readFileToArray()
-		// validateUrls(urlsFromFile)
-		info.newsSources = appendUrlsToDefault(defaultNewsSources, urlsFromFile)
-
+		urlsFromFile, err := readFileToArray(info.args["U"])
+		if err != nil {
+			panic(err)
+		}
+		validateUrls(urlsFromFile)
+		info.newsSources = append(info.defaultNewsSources, urlsFromFile...)
 	} else {
-		info.newsSources = defaultNewsSources
+		info.newsSources = info.defaultNewsSources
 	}
 
-	// -q quiet the jibberish
-	// -p private
-	// -H "" is false if not "" print extra help
 	return nil
+}
+
+func (info *gzhodanInfo) printExtraHelp() {
+	flag.Usage()
+	fmt.Fprintf(os.Stdout, "Extra helpful help:\n\n")
+	fmt.Fprintf(os.Stdout, "Default browser: firefox\n")
+	fmt.Fprintf(os.Stdout, "Default random browsers %v\n", info.possibleBrowsers[1:])
+	fmt.Fprintf(os.Stdout, "Default urls:\n") 
+	for _,url := range info.defaultNewsSources {
+		fmt.Fprintf(os.Stdout, "\t%s\n", url)
+	}
 }
 
 func main() {
 	info := gzhodanInfo{}
 	info.args = make(map[string]string)
-	info.args["u"], info.args["U"] = "", "" // info.args[""]
 	info.possibleBrowsers = []string{"debug", "firefox", "librewolf"}
+	info.defaultNewsSources = []string{"https://www.youtube.com/@cybernews/videos", "https://www.youtube.com/@Seytonic/videos", "https://www.youtube.com/@hak5/videos", "https://www.sans.org/newsletters/at-risk/", "https://thehackernews.com/search?max-results=20", "https://arstechnica.com/security/", "https://danielmiessler.com/", "https://portswigger.net/research/articles", "https://hackread.com/", "https://news.risky.biz/"}
 
-	// https://gobyexample.com/command-line-flags
-	// pass *vars to parseArgs(), which I have done, but i freaks from apparently its nasty comment given - function should not have too many args F# guy unix like
-
-	// with map control flow is done via the flags as a key value - which is inherently boolaen like AND still two pointer close to one another AND not have worry about pointers to weird memory - we are more secure by write "" into a place
-
-	// Variables from scaffold future updates
-	privateBool := false          // ISSUE regarding cli there is no --new-private-tab !!
-	randomiseBrowserBool := false // deal with when add -b
-
-	var urlFilePathArg string
-	flag.StringVar(&urlFilePathArg, "-U", "", "Append urls .txt file containing a list urls one per line to the default urls; -H for default urls")
-	flag.StringVar(&urlFilePathArg, "-u", "", "Provide .txt file containing a list urls one per line; -H for default urls")
+	var extraHelpBool, privateBrowserBool bool // ISSUE regarding cli there is no --new-private-tab !!
+	var urlFilePathArg, concatUrlFileArg, userSelectedBrowser string
+	flag.StringVar(&concatUrlFileArg, "U", "", "Append urls .txt file containing a list urls one per line to the default urls; -H for default urls")
+	flag.StringVar(&urlFilePathArg, "u", "", "Provide .txt file containing a list urls one per line; -H for default urls")
+	flag.StringVar(&userSelectedBrowser, "b", "firefox", "Provide a browser path or accessable in $PATH variable default is firefox, if random a random browser is selected from  hardcoded list, if random.txt then it is selected from that list; -H for hardcoded randomised")
+	flag.BoolVar(&extraHelpBool, "H", false, "Display extra help information including: default browsers, urls")
+	flag.BoolVar(&privateBrowserBool, "p", false, "Use private browser windows and tabs - is not really private just deletes history")	
 	flag.Parse()
-	args := flag.Args()
 
+	info.args["u"], info.args["U"], info.args["b"] = urlFilePathArg, concatUrlFileArg, userSelectedBrowser
 	printBanner()
 
-	err := info.parseArgs(args)
+	if extraHelpBool {
+		info.printExtraHelp()
+		os.Exit(0)
+	}
+
+	err := info.parseArgs()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error: Unable to parse CLI arguments", err)
 		panic(err)
 	}
 
 	printJibberish(21)
-
-	if randomiseBrowserBool {
-		printJibberish(19)
-		info.randomiseBrowser()
-	} else {
-		info.browser = "firefox"
-	}
 
 	argsPrivateWindowAndYouTubeCookies := []string{"--private-window", "https://www.youtube.com/"}
 	argsAndYouTubeCookies := []string{"--new-window", "https://www.youtube.com/"}
@@ -348,7 +422,7 @@ func main() {
 
 	printJibberish(1)
 
-	if privateBool {
+	if privateBrowserBool {
 		fmt.Fprintf(os.Stdout, "Starting private %s window for YouTube\n", info.browser)
 		startYouTube := exec.Command(info.browser, argsPrivateWindowAndYouTubeCookies...)
 		err := startYouTube.Start()
@@ -364,6 +438,7 @@ func main() {
 		printJibberish(4)
 		err = info.findBrowserAndRejectYouTubeCookies()
 		if nil != err {
+			printJibberish(23)
 			fmt.Fprintln(os.Stderr, "Error: could not reject YouTube cookies", err)
 			panic(err)
 		}
@@ -398,7 +473,7 @@ func main() {
 		}
 
 		printJibberish(7)
-		time.Sleep(5 * time.Second)
+		time.Sleep(10 * time.Second)
 		printJibberish(8)
 
 		info.openAllUrlsInbrowser()
@@ -418,6 +493,7 @@ func main() {
 	_, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer handleTermination(cancel)
 
+	printJibberish(22)
 	os.Exit(0)
 }
 
@@ -467,6 +543,10 @@ func printJibberish(jibberID int) {
 		fmt.Fprintln(os.Stdout, "FEATURE CREEP CONFIRMED!")
 	case 21:
 		fmt.Fprintln(os.Stdout, "Good news everyone!")
+	case 22: 
+		fmt.Fprintln(os.Stdout, "Now these these points of data make a wonderful line. And we are out beta, We're releasing on time. So I'm GLaD, I got burned, think of all the things we learned for the people who are still alive..while you're dying I'll be still alive, And when you're dead I will be still alive..")
+	case 23:
+		fmt.Fprintln(os.Stdout, "No cookies Gzhomit, we've forget the cookies")
 	case -1:
 		fmt.Fprintln(os.Stdout, "aHR0cHM6Ly9nY2hxLmdpdGh1Yi5pby9DeWJlckNoZWYvI3JlY2lwZT1Gcm9tX0Jhc2U2NCgnQS1aYS16MC05JTJCLyUzRCcsdHJ1ZSxmYWxzZSlGcm9tX0hleCgnQXV0bycpWE9SKCU3QidvcHRpb24nOidIZXgnLCdzdHJpbmcnOidEZWVzJyU3RCwnU3RhbmRhcmQnLGZhbHNlKUFFU19EZWNyeXB0KCU3QidvcHRpb24nOidVVEY4Jywnc3RyaW5nJzonTnV0cy4uLi4uLi4uLi4uLiclN0QsJTdCJ29wdGlvbic6J1VURjgnLCdzdHJpbmcnOidHb3R0ZW1HT1RURU1MTUFPJyU3RCwnQ0JDJywnSGV4JywnUmF3JywlN0Inb3B0aW9uJzonSGV4Jywnc3RyaW5nJzonJyU3RCwlN0Inb3B0aW9uJzonSGV4Jywnc3RyaW5nJzonJyU3RCk=")
 	}
