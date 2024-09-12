@@ -65,6 +65,7 @@ func (info *gzhodanInfo) findBrowserAndRejectYouTubeCookies() error {
 		panic(err)
 	}
 	printJibberish(6)
+	time.Sleep(10 * time.Second)
 	err = xdotoolFindBrowser.Wait()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
@@ -110,7 +111,7 @@ func (info *gzhodanInfo) openAllUrlsInPrivateBrowser() error {
 	const xdotoolSearch string = "xdotool search --onlyvisible --class "
 	const xdotoolWindowActivateArg string = " windowactivate"
 	const xdotoolNewTabKeysArg string = " --sync key --clearmodifiers ctrl+t"
-	const xdotoolTargetUrlBarArgs string = " --sync key --clearmodifiers ctrl+l"
+	//const xdotoolTargetUrlBarArgs string = " --sync key --clearmodifiers ctrl+l"
 	const xdotoolKeyReturnArgs string = " --sync key Return"
 
 	builder := strings.Builder{}
@@ -118,8 +119,8 @@ func (info *gzhodanInfo) openAllUrlsInPrivateBrowser() error {
 	builder.WriteString(info.browser)
 	builder.WriteString(xdotoolWindowActivateArg)
 	xdtKeySpecialChar, xdtFindSpecificBrowserArgs, xdtConfirmUrlArgs, xdtOpenNewPrivateTabArgs, xdtTypeUrlCmdNoUrl := builder.String(), builder.String(), builder.String(), builder.String(), builder.String()
-	builder.WriteString(xdotoolTargetUrlBarArgs)
-	xdtTargetUrlBarArgs := builder.String()
+	//builder.WriteString(xdotoolTargetUrlBarArgs)
+	//xdtTargetUrlBarArgs := builder.String()
 	builder.Reset()
 	xdtConfirmUrlArgs = xdtConfirmUrlArgs + xdotoolKeyReturnArgs
 	xdtOpenNewPrivateTabArgs = xdtOpenNewPrivateTabArgs + xdotoolNewTabKeysArg
@@ -190,9 +191,7 @@ func (info *gzhodanInfo) openAllUrlsInPrivateBrowser() error {
 		//		}
 		//		fmt.Fprintf(os.Stdout, "xdotool is now focused on URL bar for browser for url number %v : %s\n", i, info.newsSources[i])
 
-		
-
-		if strings.Contains(info.newSources, "@") {
+		if strings.Contains(info.newsSources[i], "@") {
 			for i, url := range info.singleAmpersandUrls {
 				splitUrl := strings.Split(url, "@")
 				builder := strings.Builder{}
@@ -201,15 +200,15 @@ func (info *gzhodanInfo) openAllUrlsInPrivateBrowser() error {
 				builder.WriteString(splitUrl[0])
 				cmdArgs := builder.String()
 				builder.Reset()
-				xdtTypePartialUrl := exec.Command("/bin/bash", "-c", cmdArgs)
-				err = xdtTypeFirstParUrl.Start()
+				xdtTypeFirstPartialUrl := exec.Command("/bin/bash", "-c", cmdArgs)
+				err = xdtTypeFirstPartialUrl.Start()
 				if nil != err {
 					fmt.Fprintf(os.Stdout, "Only %v urls accounted for...\n", i-len(info.singleAmpersandUrls[i]))
 					fmt.Fprintln(os.Stderr, "Error:", err)
 					fmt.Fprintf(os.Stdout, "Unable to execute `%s %s`\n", "/bin/bash -c")
 					panic(err)
 				}
-				err = xdtTypeFirstParUrl.Wait()
+				err = xdtTypeFirstPartialUrl.Wait()
 				if err != nil {
 					fmt.Fprintln(os.Stderr, "Error:", err)
 					fmt.Fprintf(os.Stdout, "Unable to complete execution of `%s %s`\n", "/bin/bash -c", cmdArgs)
@@ -223,7 +222,7 @@ func (info *gzhodanInfo) openAllUrlsInPrivateBrowser() error {
 				builder.WriteString(splitUrl[1])
 				cmdArgs = builder.String()
 				builder.Reset()
-				xdtTypePartialUrl := exec.Command("/bin/bash", "-c", cmdArgs)
+				xdtKeyAmpersand := exec.Command("/bin/bash", "-c", cmdArgs)
 				err = xdtKeyAmpersand.Start()
 				if nil != err {
 					fmt.Fprintf(os.Stdout, "Only %v urls accounted for...\n", i-len(info.singleAmpersandUrls[i]))
@@ -245,15 +244,15 @@ func (info *gzhodanInfo) openAllUrlsInPrivateBrowser() error {
 				builder.WriteString(splitUrl[2])
 				cmdArgs = builder.String()
 				builder.Reset()
-				xdtTypeSecondParUrl := exec.Command("/bin/bash", "-c", cmdArgs)
-				err = xdtOpenNewPrivateTab.Start()
+				xdtTypeSecondPartialUrl := exec.Command("/bin/bash", "-c", cmdArgs)
+				err = xdtTypeSecondPartialUrl.Start()
 				if nil != err {
 					fmt.Fprintf(os.Stdout, "Only %v urls accounted for...\n", i-len(info.singleAmpersandUrls[i]))
 					fmt.Fprintln(os.Stderr, "Error:", err)
 					fmt.Fprintf(os.Stdout, "Unable to execute `%s %s`\n", "/bin/bash -c")
 					panic(err)
 				}
-				err = xdtTypeSecondParUrl.Wait()
+				err = xdtTypeSecondPartialUrl.Wait()
 				if err != nil {
 					fmt.Fprintln(os.Stderr, "Error:", err)
 					fmt.Fprintf(os.Stdout, "Unable to complete execution of `%s %s`\n", "/bin/bash -c", cmdArgs)
@@ -274,8 +273,8 @@ func (info *gzhodanInfo) openAllUrlsInPrivateBrowser() error {
 			err = xdtTypeURLintoBrowser.Start()
 			if nil != err {
 				fmt.Fprintf(os.Stdout, "Only %v urls accounted for...\n", i-len(info.newsSources))
-				fmt.fprintln(os.stderr, "error:", err)
-				fmt.fprintf(os.stdout, "unable to execute `%s %s`\n", "/bin/bash -c", xdttypeurlfullcmd)
+				fmt.Fprintln(os.Stderr, "error:", err)
+				fmt.Fprintf(os.Stdout, "unable to execute `%s %s`\n", "/bin/bash -c", xdtTypeUrlFullCmd)
 				panic(err)
 			}
 			err = xdtTypeURLintoBrowser.Wait()
@@ -645,7 +644,7 @@ func printJibberish(jibberID int) {
 	case 11:
 		fmt.Fprintln(os.Stdout, "Steady on single file I said")
 	case 12:
-		fmt.Fprintln(os.Stdout, "Great, but not bad... there will questions and explaination for centuries ... remember who you are talking too all knowing, all seeing...hmmmm")
+		fmt.Fprintln(os.Stdout, "Great, but not bad... there will be questions and explaination for centuries ... remember who you are talking too all knowing, all seeing...hmmmm")
 	case 13:
 		fmt.Fprintln(os.Stdout, "..try to stay out of trouble; value loyality above everything else")
 	case 14:
