@@ -33,8 +33,8 @@ type gzhodanInfo struct {
 	xdtKeySpecialChar                    string
 	xdtTargetUrlBarArgs                  string
 	xdtTypeUrlFullCmd                    string
-	timeToSleep                          int
-	timeToSleepHalf                      int
+	timeToSleep                          time.Duration
+	timeToSleepHalf                      time.Duration
 }
 
 func (info *gzhodanInfo) randomiseBrowser() {
@@ -88,7 +88,7 @@ func (info *gzhodanInfo) findBrowserAndRejectYouTubeCookies() error {
 		panic(err)
 	}
 	printJibberish(6)
-	time.Sleep(10 * time.Second)
+	time.Sleep(info.timeToSleep * time.Second)
 	if err := xdotoolFindBrowser.Wait(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		panic(err)
@@ -114,7 +114,7 @@ func (info *gzhodanInfo) findBrowserAndRejectReutersCookies() error {
 		panic(err)
 	}
 	printJibberish(6)
-	time.Sleep(10 * time.Second)
+	time.Sleep(info.timeToSleep * time.Second)
 	if err := xdotoolFindBrowser.Wait(); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		panic(err)
@@ -431,20 +431,47 @@ func (info *gzhodanInfo) parseArgs() (err error) {
 	}
 
 	// Never need to check dangerous int types with:
-	digitsRegex := regexp.MustCompile(`[0-9]+`)
-	matchNum, err := regexp.MatchString(digitsRegex.String(), info.args["t"])
+	// "ns", "us" (or "µs"), "ms", "s", "m", "h"
+
+	digitsAndUnitsRegex := regexp.MustCompile(`(\d{1,})([ns]{2}|[us]{2}|[µs]{2}|[ms]{2}|[s]{1}|[m]{1}|[h]{1})`)
+	matchNum, err := regexp.MatchString(digitsAndUnitsRegex.String(), info.args["t"])
 	if err != nil || !matchNum {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		fmt.Fprintln(os.Stdout, "Due to a failure to match default value provided")
-		info.timeToSleep, info.timeToSleepHalf = 10, 5
+		info.timeToSleep, err = time.ParseDuration("10s")
+		if err != nil {
+			panic(err)
+		}
+		info.timeToSleepHalf, err = time.ParseDuration("5s")
+		if err != nil {
+			panic(err)
+		}
 	} else {
-		info.timeToSleep, err = strconv.Atoi(info.args["t"])
+		info.timeToSleep, err = time.ParseDuration(info.args["t"])
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error:", err)
 			fmt.Fprintln(os.Stdout, "Due to a failure to match default value provided")
-			info.timeToSleep = 10
+			info.timeToSleep, err = time.ParseDuration("10s")
+			if err != nil {
+				panic(err)
+			}
 		}
-		info.timeToSleepHalf = info.timeToSleep / 2
+		digitsSplit := regexp.MustCompile(`([ns]{2}|[us]{2}|[µs]{2}|[ms]{2}|[s]{1}|[m]{1}|[h]{1})`).Split("9ms", -1)
+		unitSplit := regexp.MustCompile(`(\d{1,})`).Split("9ms", -1)
+		digitAsInt, err := strconv.Atoi(digitsSplit[0])
+		if err != nil {
+			panic(err)
+		}
+		halfDigitAsInt := digitAsInt / 2
+		info.timeToSleepHalf, err = time.ParseDuration(strconv.Itoa(halfDigitAsInt) + unitSplit[1])
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			fmt.Fprintln(os.Stdout, "Due to a failure to match default value provided")
+			info.timeToSleep, err = time.ParseDuration("5s")
+			if err != nil {
+				panic(err)
+			}
+		}
 	}
 
 	return nil
@@ -453,7 +480,7 @@ func (info *gzhodanInfo) parseArgs() (err error) {
 func (info *gzhodanInfo) printExtraHelp() {
 	flag.Usage()
 	fmt.Fprintf(os.Stdout, "Extra helpful help:\n\n")
-	fmt.Fprintf(os.Stdout, "Default -t Delay is 1.5 x provided value")
+	fmt.Fprintf(os.Stdout, "Default -t Delay is 1.5 x provided value with a go/time suffix \"ns\", \"us\" (or \"µs\"), \"ms\", \"s\", \"m\" or \"h\".")
 	fmt.Fprintf(os.Stdout, "Default browser: firefox\n")
 	fmt.Fprintf(os.Stdout, "Default random browsers %v\n", info.possibleBrowsers[1:])
 	fmt.Fprintf(os.Stdout, "Default urls:\n")
@@ -572,7 +599,7 @@ func main() {
 	flag.BoolVar(&privateBrowserBool, "p", false, "Use private browser windows and tabs - is not really private just deletes history")
 	flag.Parse()
 
-	info.args["t"], info.args["u"], info.args["U"], info.args["b"] = urlFilePathArg, concatUrlFileArg, userSelectedBrowser, userTimeToSleep
+	info.args["t"], info.args["u"], info.args["U"], info.args["b"] = userTimeToSleep, urlFilePathArg, concatUrlFileArg, userSelectedBrowser
 	printBanner()
 
 	if extraHelpBool {
@@ -603,10 +630,10 @@ func main() {
 			panic(err)
 		}
 		printJibberish(2)
-		time.Sleep(5 * time.Second)
+		time.Sleep(info.timeToSleepHalf * time.Second)
 		printJibberish(3)
 		info.browserPID = strconv.Itoa(startYouTube.Process.Pid)
-		time.Sleep(10 * time.Second)
+		time.Sleep(info.timeToSleep * time.Second)
 		printJibberish(4)
 		if err := info.findBrowserAndRejectYouTubeCookies(); err != nil {
 			printJibberish(23)
@@ -615,9 +642,9 @@ func main() {
 		}
 
 		printJibberish(7)
-		time.Sleep(5 * time.Second)
+		time.Sleep(info.timeToSleepHalf * time.Second)
 		printJibberish(8)
-		time.Sleep(10 * time.Second)
+		time.Sleep(info.timeToSleep * time.Second)
 		if err := info.findBrowserAndRejectReutersCookies(); err != nil {
 			printJibberish(23)
 			fmt.Fprintln(os.Stderr, "Error: could not reject YouTube cookies", err)
@@ -625,9 +652,9 @@ func main() {
 		}
 
 		printJibberish(24)
-		time.Sleep(5 * time.Second)
+		time.Sleep(info.timeToSleepHalf * time.Second)
 		printJibberish(25)
-		time.Sleep(10 * time.Second)
+		time.Sleep(info.timeToSleep * time.Second)
 		if err := info.openAllUrlsInPrivateBrowser(); err != nil {
 			fmt.Fprintln(os.Stderr, "Error: could nopen all URLs ", err)
 			panic(err)
@@ -650,10 +677,10 @@ func main() {
 		}
 
 		printJibberish(2)
-		time.Sleep(5 * time.Second)
+		time.Sleep(info.timeToSleepHalf * time.Second)
 		printJibberish(3)
 		info.browserPID = strconv.Itoa(startYouTube.Process.Pid)
-		time.Sleep(10 * time.Second)
+		time.Sleep(info.timeToSleep * time.Second)
 		printJibberish(4)
 		if err := info.findBrowserAndRejectYouTubeCookies(); err != nil {
 			fmt.Fprintln(os.Stderr, "Error: could not reject YouTube cookies", err)
@@ -669,9 +696,9 @@ func main() {
 		}
 
 		printJibberish(7)
-		time.Sleep(5 * time.Second)
+		time.Sleep(info.timeToSleepHalf * time.Second)
 		printJibberish(8)
-		time.Sleep(10 * time.Second)
+		time.Sleep(info.timeToSleep * time.Second)
 		if err := info.findBrowserAndRejectReutersCookies(); err != nil {
 			printJibberish(23)
 			fmt.Fprintln(os.Stderr, "Error: could not reject YouTube cookies", err)
@@ -679,9 +706,9 @@ func main() {
 		}
 
 		printJibberish(24)
-		time.Sleep(5 * time.Second)
+		time.Sleep(info.timeToSleepHalf * time.Second)
 		printJibberish(25)
-		time.Sleep(10 * time.Second)
+		time.Sleep(info.timeToSleep * time.Second)
 		if err := info.openAllUrlsInbrowser(); err != nil {
 			fmt.Fprintln(os.Stderr, "Error: could not open all URLs ", err)
 			panic(err)
