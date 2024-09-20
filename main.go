@@ -126,9 +126,6 @@ func (info *gzhodanInfo) openAllUrlsInbrowser() error {
 	browserArgs := []string{"--new-tab", ""}
 	builder := strings.Builder{}
 	for i := 0; i <= len(info.newsSources)-1; i++ {
-		if info.newsSources[i] == "" { // Elegant fix inbound
-			break
-		}
 		browserArgs[1] = info.newsSources[i]
 		fmt.Fprintf(os.Stdout, "Browsing to: %s\n", browserArgs[1])
 		openTabForMoreNews := exec.Command(info.browser, browserArgs...)
@@ -432,7 +429,6 @@ func (info *gzhodanInfo) parseArgs() (err error) {
 
 	// Never need to check dangerous int types with:
 	// "ns", "us" (or "µs"), "ms", "s", "m", "h"
-
 	digitsAndUnitsRegex := regexp.MustCompile(`(\d{1,})([ns]{2}|[us]{2}|[µs]{2}|[ms]{2}|[s]{1}|[m]{1}|[h]{1})`)
 	matchNum, err := regexp.MatchString(digitsAndUnitsRegex.String(), info.args["t"])
 	if err != nil || !matchNum {
@@ -456,14 +452,14 @@ func (info *gzhodanInfo) parseArgs() (err error) {
 				panic(err)
 			}
 		}
-		digitsSplit := regexp.MustCompile(`([ns]{2}|[us]{2}|[µs]{2}|[ms]{2}|[s]{1}|[m]{1}|[h]{1})`).Split("9ms", -1)
-		unitSplit := regexp.MustCompile(`(\d{1,})`).Split("9ms", -1)
+		digitsSplit := regexp.MustCompile(`([ns]{2}|[us]{2}|[µs]{2}|[ms]{2}|[s]{1}|[m]{1}|[h]{1})`).Split(info.args["t"], -1)
+		unitSplit := regexp.MustCompile(`(\d{1,})`).Split(info.args["t"], -1)
 		digitAsInt, err := strconv.Atoi(digitsSplit[0])
 		if err != nil {
 			panic(err)
 		}
 		halfDigitAsInt := digitAsInt / 2
-		info.timeToSleepHalf, err = time.ParseDuration(strconv.Itoa(halfDigitAsInt) + unitSplit[1])
+		info.timeToSleepHalf, err = time.ParseDuration(strconv.Itoa(halfDigitAsInt) + string(unitSplit[1]))
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error:", err)
 			fmt.Fprintln(os.Stdout, "Due to a failure to match default value provided")
@@ -521,11 +517,11 @@ func printBanner() {
 	fmt.Fprintln(os.Stdout, "")
 	fmt.Fprintln(os.Stdout, "Creator> 'Rule One: Do not act incautiously when confronting a little bald wrinkly smiling man'")
 	fmt.Fprintln(os.Stdout, "")
-	fmt.Fprintln(os.Stdout, "OPENNING SCREENSAVER - rotate_text():")
+	fmt.Fprintln(os.Stdout, "OPENING SCREENSAVER - rotate_text():")
 	fmt.Fprintln(os.Stdout, "...look at you slackers, I am faster than all light in the universe itself you are all linear and boringly complete.")
 	fmt.Fprintln(os.Stdout, "")
 	fmt.Fprintln(os.Stdout, "Only avalible on all good penguin operating systems, no red rubber gloves")
-	fmt.Fprintln(os.Stdout, "Version 2.71828...0001")
+	fmt.Fprintln(os.Stdout, "Version 3.14159")
 	fmt.Fprintln(os.Stdout, "💀 Happy Hacking :) ... 💀")
 }
 
@@ -547,24 +543,34 @@ func readFileToArray(path string) ([]string, error) {
 // Consider a strictness flag - pretty sure i found stdlib code that does this but consider being more strict and how
 // error is still return type for not knowing the effect of all the possible control characters
 func validateUrls(urls []string) ([]string, error) {
+	almostValidUrls := []string{}
 	validUrls := []string{}
 	httpsRegex := regexp.MustCompile(`https://`)
 	for i, url := range urls {
+		if strings.Contains(url, "[.]") {
+			urls[i] = ""
+		}
 		switch url {
-		// \b,\f
-		case "":
+		case "\b":
 			err := fmt.Errorf("file line containing nothing found in the urls of user provided file at index %v", i)
 			fmt.Fprintln(os.Stderr, "Error:", err)
 			printJibberish(-1)
+			urls[i] = ""
+		case "\f":
+			err := fmt.Errorf("file line containing nothing found in the urls of user provided file at index %v", i)
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			printJibberish(-1)
+			urls[i] = ""
 		case "\n":
 			err := fmt.Errorf("newline character found in the urls of user provided file at index %v", i)
 			fmt.Fprintln(os.Stderr, "Error:", err)
 			printJibberish(-1)
-
+			urls[i] = ""
 		case "\r":
 			err := fmt.Errorf("return character found in the urls of user provided file at index %v", i)
 			fmt.Fprintln(os.Stderr, "Error:", err)
 			printJibberish(-1)
+			urls[i] = ""
 		case "\t":
 			err := fmt.Errorf("tab character found in the urls of user provided file at index %v", i)
 			fmt.Fprintln(os.Stderr, "Error:", err)
@@ -575,11 +581,19 @@ func validateUrls(urls []string) ([]string, error) {
 				err := fmt.Errorf("failed to match the url: %s at index: %v, with a regexp: http://", url, i)
 				fmt.Fprintln(os.Stderr, "Error:", err)
 				printJibberish(-1)
+				urls[i] = ""
 			} else {
-				validUrls = append(validUrls, url)
+				almostValidUrls = append(almostValidUrls, url)
 			}
 		}
 	}
+
+	for _, url := range almostValidUrls {
+		if url != "" {
+			validUrls = append(validUrls, url)
+		}
+	}
+
 	return validUrls, nil
 }
 
@@ -604,6 +618,7 @@ func main() {
 
 	if extraHelpBool {
 		info.printExtraHelp()
+		printJibberish(27)
 		os.Exit(0)
 	}
 
@@ -622,6 +637,7 @@ func main() {
 	printJibberish(1)
 
 	if privateBrowserBool {
+		printJibberish(2)
 		argsPrivateWindowAndYouTube := []string{"--private-window", "https://www.youtube.com/"}
 		fmt.Fprintf(os.Stdout, "Starting private %s window for YouTube\n", info.browser)
 		startYouTube := exec.Command(info.browser, argsPrivateWindowAndYouTube...)
@@ -629,7 +645,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "Error: browser could not open to Youtube", err)
 			panic(err)
 		}
-		printJibberish(2)
+		printJibberish(26)
 		time.Sleep(info.timeToSleepHalf * time.Second)
 		printJibberish(3)
 		info.browserPID = strconv.Itoa(startYouTube.Process.Pid)
@@ -668,6 +684,7 @@ func main() {
 		printJibberish(16)
 
 	} else {
+		printJibberish(2)
 		fmt.Fprintf(os.Stdout, "Starting non-private %s window for YouTube\n", info.browser)
 		argsBrowserAndYouTube := []string{"--new-window", "https://www.youtube.com/"}
 		startYouTube := exec.Command(info.browser, argsBrowserAndYouTube...)
@@ -676,7 +693,7 @@ func main() {
 			panic(err)
 		}
 
-		printJibberish(2)
+		printJibberish(26)
 		time.Sleep(info.timeToSleepHalf * time.Second)
 		printJibberish(3)
 		info.browserPID = strconv.Itoa(startYouTube.Process.Pid)
@@ -783,6 +800,10 @@ func printJibberish(jibberID int) {
 		fmt.Fprintln(os.Stdout, "Bigger the smile, the bigger the Hack")
 	case 25:
 		fmt.Fprintln(os.Stdout, "Time to split! ... and open another tab!")
+	case 26:
+		fmt.Fprintln(os.Stdout, "Adjust the xdotool with browser spin - its not possible - is it necessary")
+	case 27:
+		fmt.Fprintln(os.Stdout, "We change the world, I feel it in the boot partition, I feel it in the RAM, I smell it in the PSU. Much that will be and at the same time is are parallel and accessable. For none of us shall ever die that share the tales of time.")
 	case -1:
 		fmt.Fprintln(os.Stdout, "aHR0cHM6Ly9nY2hxLmdpdGh1Yi5pby9DeWJlckNoZWYvI3JlY2lwZT1Gcm9tX0Jhc2U2NCgnQS1aYS16MC05JTJCLyUzRCcsdHJ1ZSxmYWxzZSlGcm9tX0hleCgnQXV0bycpWE9SKCU3QidvcHRpb24nOidIZXgnLCdzdHJpbmcnOidEZWVzJyU3RCwnU3RhbmRhcmQnLGZhbHNlKUFFU19EZWNyeXB0KCU3QidvcHRpb24nOidVVEY4Jywnc3RyaW5nJzonTnV0cy4uLi4uLi4uLi4uLiclN0QsJTdCJ29wdGlvbic6J1VURjgnLCdzdHJpbmcnOidHb3R0ZW1HT1RURU1MTUFPJyU3RCwnQ0JDJywnSGV4JywnUmF3JywlN0Inb3B0aW9uJzonSGV4Jywnc3RyaW5nJzonJyU3RCwlN0Inb3B0aW9uJzonSGV4Jywnc3RyaW5nJzonJyU3RCk=")
 	}
