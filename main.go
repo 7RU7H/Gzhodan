@@ -427,46 +427,57 @@ func (info *gzhodanInfo) parseArgs() (err error) {
 		info.newsSources = info.defaultNewsSources
 	}
 
-	// Never need to check dangerous int types with:
-	// "ns", "us" (or "µs"), "ms", "s", "m", "h"
-	digitsAndUnitsRegex := regexp.MustCompile(`(\d{1,})([ns]{2}|[us]{2}|[µs]{2}|[ms]{2}|[s]{1}|[m]{1}|[h]{1})`)
-	matchNum, err := regexp.MatchString(digitsAndUnitsRegex.String(), info.args["t"])
-	if err != nil || !matchNum {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		fmt.Fprintln(os.Stdout, "Due to a failure to match default value provided")
-		info.timeToSleep, err = time.ParseDuration("10s")
-		if err != nil {
-			panic(err)
-		}
-		info.timeToSleepHalf, err = time.ParseDuration("5s")
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		info.timeToSleep, err = time.ParseDuration(info.args["t"])
-		if err != nil {
+	if info.args["t"] != "" {
+		// Never need to check dangerous int types with:
+		// "ns", "us" (or "µs"), "ms", "s", "m", "h"
+		digitsAndUnitsRegex := regexp.MustCompile(`(\d{1,})([ns]{2}|[us]{2}|[µs]{2}|[ms]{2}|[s]{1}|[m]{1}|[h]{1})`)
+		matchNum, err := regexp.MatchString(digitsAndUnitsRegex.String(), info.args["t"])
+		if err != nil || !matchNum {
 			fmt.Fprintln(os.Stderr, "Error:", err)
 			fmt.Fprintln(os.Stdout, "Due to a failure to match default value provided")
 			info.timeToSleep, err = time.ParseDuration("10s")
 			if err != nil {
 				panic(err)
 			}
-		}
-		digitsSplit := regexp.MustCompile(`([ns]{2}|[us]{2}|[µs]{2}|[ms]{2}|[s]{1}|[m]{1}|[h]{1})`).Split(info.args["t"], -1)
-		unitSplit := regexp.MustCompile(`(\d{1,})`).Split(info.args["t"], -1)
-		digitAsInt, err := strconv.Atoi(digitsSplit[0])
-		if err != nil {
-			panic(err)
-		}
-		halfDigitAsInt := digitAsInt / 2
-		info.timeToSleepHalf, err = time.ParseDuration(strconv.Itoa(halfDigitAsInt) + string(unitSplit[1]))
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error:", err)
-			fmt.Fprintln(os.Stdout, "Due to a failure to match default value provided")
-			info.timeToSleep, err = time.ParseDuration("5s")
+			info.timeToSleepHalf, err = time.ParseDuration("5s")
 			if err != nil {
 				panic(err)
 			}
+		} else {
+			info.timeToSleep, err = time.ParseDuration(info.args["t"])
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "Error:", err)
+				fmt.Fprintln(os.Stdout, "Due to a failure to match default value provided")
+				info.timeToSleep, err = time.ParseDuration("10s")
+				if err != nil {
+					panic(err)
+				}
+			}
+			digitsSplit := regexp.MustCompile(`([ns]{2}|[us]{2}|[µs]{2}|[ms]{2}|[s]{1}|[m]{1}|[h]{1})`).Split(info.args["t"], -1)
+			unitSplit := regexp.MustCompile(`(\d{1,})`).Split(info.args["t"], -1)
+			digitAsInt, err := strconv.Atoi(digitsSplit[0])
+			if err != nil {
+				panic(err)
+			}
+			halfDigitAsInt := digitAsInt / 2
+			info.timeToSleepHalf, err = time.ParseDuration(strconv.Itoa(halfDigitAsInt) + string(unitSplit[1]))
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "Error:", err)
+				fmt.Fprintln(os.Stdout, "Due to a failure to match default value provided")
+				info.timeToSleep, err = time.ParseDuration("5s")
+				if err != nil {
+					panic(err)
+				}
+			}
+		}
+	} else {
+		info.timeToSleep, err = time.ParseDuration("10s")
+		if err != nil {
+			panic(err)
+		}
+		info.timeToSleep, err = time.ParseDuration("5s")
+		if err != nil {
+			panic(err)
 		}
 	}
 
