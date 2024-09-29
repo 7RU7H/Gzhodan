@@ -75,10 +75,10 @@ func (info *gzhodanInfo) findBrowserAndRejectYouTubeCookies() error {
 	const xdtFindBrowerAndRejectYoutubePartTwoFourTabs string = " windowactivate --sync key Tab Tab Tab Tab Return"
 	const xdtFindBrowerAndRejectYoutubePartTwoFiveTabs string = " windowactivate --sync key Tab Tab Tab Tab Tab Return"
 	switch info.browser {
-	case "firefox":
-		info.xdtFindBrowserAndYTReject = xdtFindBrowerAndRejectYoutubePartOne + info.browser + xdtFindBrowerAndRejectYoutubePartTwoFourTabs
 	case "librewolf":
 		info.xdtFindBrowserAndYTReject = xdtFindBrowerAndRejectYoutubePartOne + info.browser + xdtFindBrowerAndRejectYoutubePartTwoFiveTabs
+	case "firefox":
+		info.xdtFindBrowserAndYTReject = xdtFindBrowerAndRejectYoutubePartOne + info.browser + xdtFindBrowerAndRejectYoutubePartTwoFourTabs
 	}
 
 	xdotoolFindBrowser := exec.Command("/bin/bash", "-c", info.xdtFindBrowserAndYTReject)
@@ -101,10 +101,10 @@ func (info *gzhodanInfo) findBrowserAndRejectReutersCookies() error {
 	const xdtFindBrowerAndRejectReutersPartTwoFourTabs string = " windowactivate --sync key Tab Tab Tab Tab Return"
 	const xdtFindBrowerAndRejectReutersPartTwoFiveTabs string = " windowactivate --sync key Tab Tab Tab Tab Tab Return"
 	switch info.browser {
-	case "firefox":
-		info.xdtFindBrowserAndReutersCookieReject = xdtFindBrowerAndRejectReutersPartOne + info.browser + xdtFindBrowerAndRejectReutersPartTwoFourTabs
 	case "librewolf":
 		info.xdtFindBrowserAndReutersCookieReject = xdtFindBrowerAndRejectReutersPartOne + info.browser + xdtFindBrowerAndRejectReutersPartTwoFiveTabs
+	case "firefox":
+		info.xdtFindBrowserAndReutersCookieReject = xdtFindBrowerAndRejectReutersPartOne + info.browser + xdtFindBrowerAndRejectReutersPartTwoFourTabs
 	}
 
 	xdotoolFindBrowser := exec.Command("/bin/bash", "-c", info.xdtFindBrowserAndReutersCookieReject)
@@ -488,7 +488,7 @@ func (info *gzhodanInfo) printExtraHelp() {
 	flag.Usage()
 	fmt.Fprintf(os.Stdout, "Extra helpful help:\n\n")
 	fmt.Fprintf(os.Stdout, "Default -t Delay is 1.5 x provided value with a go/time suffix \"ns\", \"us\" (or \"µs\"), \"ms\", \"s\", \"m\" or \"h\".")
-	fmt.Fprintf(os.Stdout, "Default browser: firefox\n")
+	fmt.Fprintf(os.Stdout, "Default browser: librewolf\n")
 	fmt.Fprintf(os.Stdout, "Default random browsers %v\n", info.possibleBrowsers[1:])
 	fmt.Fprintf(os.Stdout, "Default urls:\n")
 	for _, url := range info.defaultNewsSources {
@@ -611,14 +611,14 @@ func validateUrls(urls []string) ([]string, error) {
 func main() {
 	info := gzhodanInfo{privateBrowsing: false}
 	info.args = make(map[string]string)
-	info.possibleBrowsers = []string{"debug", "firefox", "librewolf"}
+	info.possibleBrowsers = []string{"debug", "librewolf", "firefox"}
 	info.defaultNewsSources = []string{"https://www.youtube.com/@cybernews/videos", "https://www.youtube.com/@Seytonic/videos", "https://www.youtube.com/@hak5/videos", "https://www.sans.org/newsletters/at-risk/", "https://thehackernews.com/search?max-results=20", "https://arstechnica.com/security/", "https://danielmiessler.com/", "https://portswigger.net/research/articles", "https://hackread.com/", "https://news.risky.biz/"}
 
 	var extraHelpBool, privateBrowserBool bool
 	var urlFilePathArg, concatUrlFileArg, userSelectedBrowser, userTimeToSleep string
 	flag.StringVar(&concatUrlFileArg, "U", "", "Append urls .txt file containing a list urls one per line to the default urls; -H for default urls")
 	flag.StringVar(&urlFilePathArg, "u", "", "Provide .txt file containing a list urls one per line; -H for default urls")
-	flag.StringVar(&userSelectedBrowser, "b", "firefox", "Provide a browser path or accessable in $PATH variable default is firefox, if random a random browser is selected from  hardcoded list, if random.txt then it is selected from that list; -H for hardcoded randomised")
+	flag.StringVar(&userSelectedBrowser, "b", "librewolf", "Provide a browser path or accessable in $PATH variable default is librewolf, if random a random browser is selected from  hardcoded list, if random.txt then it is selected from that list; -H for hardcoded randomised")
 	flag.StringVar(&userTimeToSleep, "t", "10", "Provide a unsigned digit to sleep (1.5 x provided value) before xdotools attempts to use the browser the default is 10, potato boxes will require alot more sleep")
 	flag.BoolVar(&extraHelpBool, "H", false, "Display extra help information including: default browsers, urls")
 	flag.BoolVar(&privateBrowserBool, "p", false, "Use private browser windows and tabs - is not really private just deletes history")
